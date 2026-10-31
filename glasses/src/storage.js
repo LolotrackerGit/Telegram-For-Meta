@@ -72,6 +72,23 @@ export function clearSession() {
   remove('session');
 }
 
+function loadLayouts() {
+  try {
+    return JSON.parse(read('layouts')) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+// Ultimo layout della tastiera usato in ogni chat.
+export function loadChatLayout(chatId) {
+  return loadLayouts()[chatId] ?? null;
+}
+
+export function saveChatLayout(chatId, layout) {
+  write('layouts', JSON.stringify({ ...loadLayouts(), [chatId]: layout }));
+}
+
 // Avviso da mostrare dopo un ricaricamento della pagina.
 export function setNotice(text) {
   try {

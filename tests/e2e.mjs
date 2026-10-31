@@ -20,7 +20,7 @@ await new Promise((resolve) => setTimeout(resolve, 500));
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: true,
-  args: ['--enable-spatial-navigation', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+  args: ['--enable-spatial-navigation'],
 });
 
 let failures = 0;
@@ -270,9 +270,17 @@ await scenario('conversazione: messaggi in arrivo non spostano chi sta leggendo'
   await openList(page, context);
   await press(page, 'Enter');
   await page.waitForSelector('.msg');
-  await page.evaluate(() => window.scrollTo(0, 100));
+  // Lontano dal fondo e fuori dalla zona che carica i messaggi vecchi.
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await page.waitForTimeout(200);
+  const reading = () => page.evaluate(() => {
+    const message = [...document.querySelectorAll('.msg')].find((item) => item.getBoundingClientRect().top > 60);
+    return { text: message.textContent, top: Math.round(message.getBoundingClientRect().top) };
+  });
+  const before = await reading();
   await page.evaluate(() => window.fakeTg.incoming('1000', 'Mentre leggi'));
-  check(await scrollY(page) === 100, 'la pagina è saltata');
+  const after = await reading();
+  check(after.text === before.text && after.top === before.top, 'la pagina è saltata');
   await page.waitForSelector('text=1 nuovo messaggio');
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await page.waitForSelector('.new-below', { state: 'hidden' });
@@ -291,24 +299,54 @@ await scenario('invio fallito: il testo resta nel campo', async (page, context) 
   check(await page.inputValue('textarea') === 'Da non perdere', 'testo perso');
 });
 
-async function openTools(page, context) {
-  await context.grantPermissions(['microphone', 'camera'], { origin: BASE });
+async function openChat(page, context) {
   await openList(page, context);
   await press(page, 'Enter');
   await page.waitForSelector('.msg');
-  await press(page, 'ArrowLeft');
-  check(await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Altre opzioni', 'il pulsante + non ha il focus');
+}
+
+const activeLabel = (page) => page.evaluate(() => document.activeElement.getAttribute('aria-label'));
+
+async function openTools(page, context) {
+  await openChat(page, context);
+  await press(page, 'ArrowLeft', 'ArrowLeft');
+  check(await activeLabel(page) === 'Altre opzioni', 'il pulsante + non ha il focus');
   await press(page, 'Enter');
   await page.waitForSelector('.tools button');
 }
 
-const lastMedia = async (page) => (await calls(page, 'sendMedia')).at(-1)?.[2];
+async function openKeyboard(page) {
+  await press(page, 'ArrowLeft');
+  check(await activeLabel(page) === 'Tastiera dell’app', 'il pulsante tastiera non ha il focus');
+  await press(page, 'Enter');
+  await page.waitForSelector('.keyboard button');
+}
+
+// Raggiunge un tasto con le sole frecce, spostandosi dalla posizione corrente.
+async function pressKey(page, label) {
+  const exact = new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`);
+  const target = page.locator('.keyboard button').filter({ hasText: exact });
+  for (let step = 0; step < 40; step += 1) {
+    const here = await page.evaluate(() => document.activeElement.getBoundingClientRect().toJSON());
+    const there = await target.boundingBox();
+    const dx = there.x + there.width / 2 - (here.x + here.width / 2);
+    const dy = there.y + there.height / 2 - (here.y + here.height / 2);
+    if (Math.abs(dx) < there.width / 2 && Math.abs(dy) < there.height / 2) {
+      await press(page, 'Enter');
+      return;
+    }
+    if (Math.abs(dy) >= there.height / 2) await press(page, dy > 0 ? 'ArrowDown' : 'ArrowUp');
+    else await press(page, dx > 0 ? 'ArrowRight' : 'ArrowLeft');
+  }
+  throw new Error(`tasto ${label} non raggiungibile con le frecce`);
+}
 
 await scenario('risposte rapide ed emoji da tastiera, senza invio automatico', async (page, context) => {
   await openTools(page, context);
   await noHorizontalScroll(page);
   await screenshot(page, 'opzioni');
   check(await activeText(page) === 'Ok', `focus su "${await activeText(page)}"`);
+  check(await page.locator('.tools button:has-text("Vocale"), .tools button:has-text("Foto")').count() === 0, 'pulsanti media ancora presenti');
   await press(page, 'Enter');
   check(await page.inputValue('textarea') === 'Ok', 'risposta non inserita');
   check(await activeText(page) === 'Invia', 'il focus deve andare su Invia');
@@ -317,88 +355,103 @@ await scenario('risposte rapide ed emoji da tastiera, senza invio automatico', a
   await page.waitForSelector('.msg.out:has-text("Ok")');
 });
 
-await scenario('vocale: registrazione e conversione in Ogg Opus valido', async (page, context) => {
-  await openTools(page, context);
-  await page.locator('.tools button:has-text("🎤 Vocale")').focus();
+await scenario('tastiera dell’app: scrive in russo con le frecce e invia', async (page, context) => {
+  await openChat(page, context);
+  await openKeyboard(page);
+  await noHorizontalScroll(page);
+  await screenshot(page, 'tastiera-ru');
+  const visible = await page.evaluate(() => [...document.querySelectorAll('.msg')]
+    .some((item) => item.getBoundingClientRect().bottom > 60 && item.getBoundingClientRect().top < 200));
+  check(visible, 'i messaggi non si vedono sopra la tastiera');
+  check(await activeText(page) === 'Й', `primo tasto "${await activeText(page)}"`);
+  for (const letter of ['П', 'р', 'и', 'в', 'е', 'т', 'т']) await pressKey(page, letter);
+  check(await page.inputValue('textarea') === 'Приветт', `testo "${await page.inputValue('textarea')}"`);
+  check(await activeText(page) === 'т', 'il focus deve restare sul tasto');
+  await pressKey(page, '⌫');
+  check(await page.inputValue('textarea') === 'Привет', 'cancellazione errata');
+  await page.locator('.composer button:text-is("Invia")').focus();
   await press(page, 'Enter');
-  await page.waitForSelector('text=Registrazione 0:0');
-  await page.waitForTimeout(1600);
-  await screenshot(page, 'vocale');
-  check(await activeText(page) === 'Invia', 'Invia non ha il focus');
-  await press(page, 'Enter');
-  await page.waitForSelector('.msg.out:has-text("🎤 Vocale")');
-  const media = await lastMedia(page);
-  check(media.kind === 'voice' && media.head === 'OggS' && media.type === 'audio/ogg', `vocale errato: ${JSON.stringify(media)}`);
-  const seconds = await page.evaluate(async () => {
-    const context = new OfflineAudioContext(1, 48000, 48000);
-    const audio = await context.decodeAudioData(await window.fakeTg.lastBlob.arrayBuffer());
-    return audio.duration;
-  });
-  check(seconds > 0.5, `Ogg non decodificabile, durata ${seconds}`);
-  check(await page.isVisible('textarea'), 'campo non ripristinato');
-  check(await activeTag(page) === 'TEXTAREA', 'focus non tornato al campo');
+  await page.waitForSelector('.msg.out:has-text("Привет")');
+  check(await page.isVisible('.keyboard'), 'la tastiera deve restare aperta dopo l’invio');
+  check(await page.inputValue('textarea') === '', 'campo non svuotato');
+  check(await page.locator('.keyboard button:text-is("Й")').count() === 1, 'maiuscola automatica assente');
 });
 
-await scenario('foto: scatto, anteprima, invio', async (page, context) => {
-  await openTools(page, context);
-  await page.locator('.tools button:has-text("📷 Foto")').focus();
-  await press(page, 'Enter');
-  await page.waitForSelector('button:text-is("Scatta")');
-  check(await activeText(page) === 'Scatta', 'Scatta non ha il focus');
-  await screenshot(page, 'foto');
-  await press(page, 'Enter');
-  await page.waitForSelector('.capture img');
-  await page.waitForSelector('button:text-is("Invia")');
-  await press(page, 'Enter');
-  await page.waitForSelector('.msg.out:has-text("📷 Foto")');
-  const media = await lastMedia(page);
-  check(media.kind === 'photo' && media.type === 'image/jpeg' && media.size > 1000, JSON.stringify(media));
+await scenario('tastiera dell’app: maiuscola una tantum, spazio e cambio di layout', async (page, context) => {
+  await openChat(page, context);
+  await openKeyboard(page);
+  await pressKey(page, 'Й');
+  await pressKey(page, 'Aa');
+  await pressKey(page, 'Ц');
+  await pressKey(page, 'у');
+  await pressKey(page, 'Spazio');
+  check(await page.inputValue('textarea') === 'ЙЦу ', `testo "${await page.inputValue('textarea')}"`);
+  await pressKey(page, 'ABC');
+  await pressKey(page, 'q');
+  await pressKey(page, '123');
+  await pressKey(page, '?');
+  await pressKey(page, 'à');
+  check(await page.inputValue('textarea') === 'ЙЦу q?à', `testo "${await page.inputValue('textarea')}"`);
+  await noHorizontalScroll(page);
+  await screenshot(page, 'tastiera-123');
+  await pressKey(page, 'Chiudi');
+  check(await page.isHidden('.keyboard'), 'tastiera ancora aperta');
+  check(await activeText(page) === 'Invia', 'Chiudi deve portare su Invia');
 });
 
-await scenario('video: registrazione breve e invio', async (page, context) => {
-  await openTools(page, context);
-  await page.locator('.tools button:has-text("🎬 Video")').focus();
-  await press(page, 'Enter');
-  await page.waitForSelector('text=Video 0:0');
-  await page.waitForTimeout(1300);
-  await press(page, 'Enter');
-  await page.waitForSelector('.msg.out:has-text("🎬 Video")');
-  const media = await lastMedia(page);
-  check(media.kind === 'video' && media.size > 1000 && media.duration >= 1, JSON.stringify(media));
+await scenario('tutti i tasti di ogni layout si raggiungono con le frecce', async (page, context) => {
+  await openChat(page, context);
+  await openKeyboard(page);
+  for (const next of ['ABC', '123', 'RU']) {
+    const labels = await page.locator('.keyboard-rows button').allTextContents();
+    for (const label of labels) {
+      const before = await page.inputValue('textarea');
+      const current = await page.locator('.keyboard-rows button').allTextContents();
+      await pressKey(page, current[labels.indexOf(label)]);
+      check((await page.inputValue('textarea')).length === before.length + 1, `tasto ${label} non scrive`);
+    }
+    await pressKey(page, next);
+  }
 });
 
-await scenario('Indietro durante una registrazione spegne microfono e fotocamera', async (page, context) => {
-  await openTools(page, context);
-  await page.evaluate(() => {
-    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia = async (constraints) => {
-      window.lastStream = await original(constraints);
-      return window.lastStream;
-    };
-  });
-  await page.locator('.tools button:has-text("🎤 Vocale")').focus();
+await scenario('il layout resta nella chat e cambia le risposte rapide', async (page, context) => {
+  await openChat(page, context);
+  await openKeyboard(page);
+  await pressKey(page, 'Chiudi');
+  await page.locator('.more[aria-label="Altre opzioni"]').focus();
   await press(page, 'Enter');
-  await page.waitForSelector('text=Registrazione 0:0');
+  await page.waitForSelector('.tools button:text-is("Спасибо")');
+  await page.locator('.more[aria-label="Tastiera dell’app"]').focus();
+  await press(page, 'Enter');
+  check(await page.isHidden('.tools'), 'il pannello + deve chiudersi');
+  await pressKey(page, 'ABC');
+  await page.reload();
+  await page.waitForSelector('.msg');
+  await page.waitForFunction(() => document.activeElement?.tagName === 'TEXTAREA');
+  await openKeyboard(page);
+  check(await page.locator('.keyboard button:text-is("Q")').count() === 1, 'layout non ricordato dopo il ricaricamento');
   await page.goBack();
   await page.waitForSelector('.chat-row');
-  const live = await page.evaluate(() => window.lastStream.getTracks().filter((track) => track.readyState === 'live').length);
-  check(live === 0, 'microfono ancora acceso');
-  check((await calls(page, 'sendMedia')).length === 0, 'inviato per errore');
+  await press(page, 'ArrowDown', 'Enter');
+  await page.waitForSelector('.msg');
+  await page.waitForFunction(() => document.activeElement?.tagName === 'TEXTAREA');
+  await openKeyboard(page);
+  check(await page.locator('.keyboard button:text-is("Й")').count() === 1, 'il layout non deve passare alle altre chat');
 });
 
-await scenario('senza microfono né fotocamera lo spiega e si può tornare indietro', async (page, context) => {
-  await context.addInitScript(() => Object.defineProperty(navigator, 'mediaDevices', { value: undefined }));
-  await openTools(page, context);
-  await page.locator('.tools button:has-text("🎤 Vocale")').focus();
+await scenario('dalla tastiera si arriva a Invia e Indietro la chiude', async (page, context) => {
+  await openChat(page, context);
+  await openKeyboard(page);
+  await pressKey(page, 'Д');
+  await pressKey(page, 'а');
+  await press(page, 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown');
+  check(await page.evaluate(() => Boolean(document.activeElement.closest('.composer'))), 'Giù non raggiunge la barra del messaggio');
+  await page.goBack();
+  await page.waitForSelector('.chat-row');
   await press(page, 'Enter');
-  await page.waitForSelector('text=non offre il microfono');
-  check(await activeText(page) === 'Annulla', 'Annulla non ha il focus');
-  await press(page, 'Enter');
-  await page.waitForSelector('textarea');
-  await press(page, 'ArrowLeft', 'Enter');
-  await page.locator('.tools button:has-text("📷 Foto")').focus();
-  await press(page, 'Enter');
-  await page.waitForSelector('text=non offre la fotocamera');
+  await page.waitForSelector('.msg');
+  check(await page.isHidden('.keyboard'), 'tastiera rimasta aperta');
+  check(await page.inputValue('textarea') === 'Да', 'bozza persa');
 });
 
 await scenario('reload dentro una chat riparte dalla chat, Indietro torna alla lista', async (page, context) => {

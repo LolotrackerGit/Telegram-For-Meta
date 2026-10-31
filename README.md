@@ -50,14 +50,22 @@ La password di verifica in due passaggi usa un campo di testo normale, perché `
 
 **Esci** si trova in fondo alla lista, chiede conferma e chiude la sessione anche su Telegram.
 
-## Scrivere e allegare
+## Scrivere
 
-Le opzioni del compositore di sistema (scrittura neurale, dettatura, tastiera) dipendono dagli occhiali e dalla loro lingua: una Web App non può aggiungerne. Per questo il pulsante **+**, a sinistra del campo, apre un pannello interno all'app:
+Il campo apre il compositore degli occhiali, ma le sue opzioni dipendono dal sistema e una Web App non può aggiungerne. Accanto al campo ci sono quindi due pulsanti dell'app.
 
-- **Risposte rapide ed emoji:** finiscono nel campo e il focus passa su **Invia**, così non parte nulla per errore.
-- **🎤 Vocale, 📷 Foto, 🎬 Video (massimo 15 secondi), 📁 File (massimo 50 MB).**
+**⌨ Tastiera dell'app** (Sinistra dal campo): scrive direttamente nel campo, senza aprire il compositore.
 
-La documentazione Meta non cita fotocamera, microfono o selezione di file per le Web App. L'app prova ad usarli e, se il dispositivo non li offre, lo dice sullo schermo. Su Chrome per computer funzionano tutti.
+- Tre layout: **RU** (ЙЦУКЕН), **ABC** e **123** con punteggiatura e accentate. Il tasto a fianco di `Aa` passa al successivo.
+- `Aa` rende maiuscola la lettera successiva; la prima lettera del messaggio lo è da sola.
+- Il focus resta sul tasto premuto. Giù dall'ultima riga porta alla barra con **Invia**.
+- L'app ricorda l'ultimo layout di ogni chat: nelle conversazioni russe si riapre in RU.
+
+**+ Risposte rapide ed emoji:** finiscono nel campo e il focus passa su **Invia**, così non parte nulla per errore. Se l'ultimo layout della chat è RU, le frasi sono in russo.
+
+## Limiti
+
+Gli occhiali non concedono alle Web App fotocamera, microfono e selezione di file: l'app non può inviare foto, video o vocali. Quelli ricevuti compaiono come etichetta (📷 Foto, 🎤 Vocale).
 
 ## Sicurezza
 

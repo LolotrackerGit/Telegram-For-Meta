@@ -1,19 +1,15 @@
-import { createCapture } from '../capture.js';
 import { h } from '../dom.js';
 import { formatDay, formatTime, isSameDay } from '../format.js';
+import { createKeyboard } from '../keyboard.js';
+import { loadChatLayout, saveChatLayout } from '../storage.js';
 
 const PAGE = 30;
 const GROUP_GAP_SECONDS = 600;
 const NEAR_BOTTOM_PX = 80;
 
 const QUICK_REPLIES = ['Ok', 'Sì', 'No', 'Arrivo', 'Ti chiamo dopo', 'Grazie'];
+const QUICK_REPLIES_RU = ['Ок', 'Да', 'Нет', 'Еду', 'Перезвоню', 'Спасибо'];
 const QUICK_EMOJI = ['👍', '❤️', '😂', '😮', '😢', '🙏', '👋', '🔥'];
-const MEDIA_ACTIONS = [
-  ['voice', '🎤 Vocale'],
-  ['photo', '📷 Foto'],
-  ['video', '🎬 Video'],
-  ['file', '📁 File'],
-];
 
 const root = document.documentElement;
 
@@ -23,6 +19,14 @@ function isNearBottom() {
 
 function scrollToEnd() {
   window.scrollTo(0, root.scrollHeight);
+}
+
+// Toglie l'ultimo carattere visibile: un'emoji può occupare più punti di codice.
+function dropLastCharacter(text) {
+  const parts = 'Segmenter' in Intl
+    ? Array.from(new Intl.Segmenter().segment(text), (part) => part.segment)
+    : Array.from(text);
+  return parts.slice(0, -1).join('');
 }
 
 function fillBody(body, message) {
@@ -94,36 +98,36 @@ export function createChatView({ tg, onRead }) {
     'aria-expanded': 'false',
     onclick: toggleTools,
   }, '+');
-  const chips = (items, action) => h('div', { class: 'chips' }, ...items.map((text) => h('button', {
+  const keyboardButton = h('button', {
     type: 'button',
-    onclick: () => action(text),
-  }, text)));
+    class: 'more',
+    'aria-label': 'Tastiera dell’app',
+    'aria-expanded': 'false',
+    onclick: toggleKeyboard,
+  }, '⌨');
+  const chip = (text) => h('button', { type: 'button', onclick: () => insertText(text) }, text);
+  const quickReplies = h('div', { class: 'chips' });
   const tools = h('div', { class: 'tools', hidden: true },
-    chips(QUICK_REPLIES, insertText),
-    chips(QUICK_EMOJI, insertText),
-    h('div', { class: 'chips' }, ...MEDIA_ACTIONS.map(([kind, label]) => h('button', {
-      type: 'button',
-      onclick: () => startCapture(kind),
-    }, label))));
-  const composer = h('div', { class: 'composer' }, moreButton, field, sendButton);
-  const capture = createCapture({
-    send: async (item, onProgress) => {
-      const target = chatId;
-      const message = await tg.sendMedia(target, item, onProgress);
-      if (target === chatId) {
-        append(message);
-        scrollToEnd();
-      }
-    },
-    onClose: () => {
-      composer.hidden = false;
-      field.focus({ preventScroll: true });
-    },
+    quickReplies,
+    h('div', { class: 'chips' }, ...QUICK_EMOJI.map(chip)));
+  const keyboard = createKeyboard({
+    getText: () => draft,
+    onInsert: (text) => setDraft(draft + text),
+    onDelete: () => setDraft(dropLastCharacter(draft)),
+    onLayout: (layout) => saveChatLayout(chatId, layout),
+    onClose: closeKeyboard,
   });
+  const composer = h('div', { class: 'composer' }, moreButton, keyboardButton, field, sendButton);
   const element = h('section', { class: 'chat', hidden: true },
     h('header', { class: 'topbar' }, title),
     h('div', { class: 'messages' }, older, list),
-    h('footer', { class: 'dock' }, newBelow, error, capture.element, tools, composer));
+    h('footer', { class: 'dock' }, newBelow, error, tools, keyboard.element, composer));
+
+  function setDraft(text) {
+    draft = text;
+    field.value = text;
+    field.scrollTop = field.scrollHeight;
+  }
 
   function setToolsOpen(open) {
     tools.hidden = !open;
@@ -132,22 +136,37 @@ export function createChatView({ tg, onRead }) {
   }
 
   function toggleTools() {
-    setToolsOpen(tools.hidden);
-    if (!tools.hidden) tools.querySelector('button').focus({ preventScroll: true });
+    const open = tools.hidden;
+    setKeyboardOpen(false);
+    setToolsOpen(open);
+    if (!open) return;
+    const replies = loadChatLayout(chatId) === 'ru' ? QUICK_REPLIES_RU : QUICK_REPLIES;
+    quickReplies.replaceChildren(...replies.map(chip));
+    tools.querySelector('button').focus({ preventScroll: true });
+  }
+
+  function setKeyboardOpen(open) {
+    if (open) keyboard.open(loadChatLayout(chatId));
+    else keyboard.close();
+    keyboardButton.setAttribute('aria-expanded', String(open));
+  }
+
+  function toggleKeyboard() {
+    const open = !keyboard.isOpen;
+    setToolsOpen(false);
+    setKeyboardOpen(open);
+  }
+
+  function closeKeyboard() {
+    setKeyboardOpen(false);
+    (draft ? sendButton : field).focus({ preventScroll: true });
   }
 
   // Le frasi pronte finiscono nel campo: l'invio resta una scelta esplicita.
   function insertText(text) {
-    draft = draft.trim() ? `${draft.trim()} ${text}` : text;
-    field.value = draft;
+    setDraft(draft.trim() ? `${draft.trim()} ${text}` : text);
     setToolsOpen(false);
     sendButton.focus({ preventScroll: true });
-  }
-
-  function startCapture(kind) {
-    setToolsOpen(false);
-    composer.hidden = true;
-    capture.start(kind);
   }
 
   const observer = new IntersectionObserver(([entry]) => {
@@ -242,8 +261,8 @@ export function createChatView({ tg, onRead }) {
     try {
       const message = await tg.sendMessage(target, text);
       if (target === chatId) {
-        field.value = '';
-        draft = '';
+        setDraft('');
+        keyboard.refresh();
         append(message);
         scrollToEnd();
       }
@@ -286,8 +305,8 @@ export function createChatView({ tg, onRead }) {
   function close() {
     if (chatId === null) return;
     drafts.set(chatId, draft);
-    capture.cancel();
     setToolsOpen(false);
+    setKeyboardOpen(false);
     session += 1;
     observer.unobserve(older);
     chatId = null;
