@@ -450,34 +450,34 @@ textarea {
   padding-inline: 8px;
 }
 
-.keyboard,
-.keyboard-rows {
-  display: grid;
-  gap: 4px;
-}
-
 .keyboard {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 4px;
   padding: 8px 12px 0;
 }
 
-.keyboard-row {
-  display: flex;
-  gap: 4px;
+.keyboard-rows {
+  display: contents;
 }
 
 .key {
-  flex: 1 1 0;
+  grid-column: span 2;
   min-inline-size: 0;
   min-block-size: 42px;
-  padding: 0 2px;
+  padding: 0;
   border-width: 1px;
   border-radius: 8px;
   font-size: 1.0625rem;
   font-weight: 500;
 }
 
+.keyboard-rows .key {
+  grid-column: span 1;
+}
+
 .key-wide {
-  flex-grow: 3;
+  grid-column: span 4;
 }
 
 .key-on {
