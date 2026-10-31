@@ -1,25 +1,26 @@
 {
-  "name": "meta-display-telegram-viewer",
-  "version": "1.0.0",
-  "description": "Telegram viewer optimized for Meta Ray-Ban Display glasses",
-  "main": "server.js",
+  "name": "tg-occhiali",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Client Telegram per Meta Ray-Ban Display, solo file statici",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "build:glasses": "node build.mjs"
+    "build": "node build.mjs",
+    "serve": "node serve.mjs",
+    "test": "node --test tests/unit.test.mjs && node tests/e2e.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.21.2",
-    "pako": "^3.0.2",
+    "big-integer": "^1.6.52",
+    "buffer": "^6.0.3",
+    "fflate": "^0.8.3",
     "qrcode": "^1.5.4",
-    "teleproto": "^1.229.2"
+    "teleproto": "1.232.0"
   },
   "devDependencies": {
-    "buffer": "^6.0.3",
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.64.1"
   }
 }

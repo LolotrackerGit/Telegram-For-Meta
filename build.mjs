@@ -1,84 +1,64 @@
-/* Builds the glasses web app into docs/ for GitHub Pages.
-   - app.js / app.css / index.html: small shell, loaded immediately
-   - vendor.js: teleproto (MTProto) bundle, lazy-loaded by the app
-   - config.js: API credentials (this is standard for Telegram web clients) */
-
-import * as esbuild from 'esbuild';
-import { mkdirSync, copyFileSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+// Costruisce il sito statico. `--fake` sostituisce Telegram con il finto dei test
+// e scrive in .e2e-dist, così il codice di test non finisce mai in docs/.
+import { build } from 'esbuild';
+import { cpSync, mkdirSync, rmSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
-const src = join(root, 'glasses', 'src');
-const out = join(root, 'docs');
+const app = join(root, 'glasses');
+const shims = join(app, 'src', 'tg', 'shims');
+const fake = process.argv.includes('--fake');
+const out = join(root, fake ? '.e2e-dist' : 'docs');
 
-mkdirSync(out, { recursive: true });
+const shim = (file) => join(shims, file);
+const unavailable = shim('unavailable.js');
 
-const empty = join(src, 'stubs', 'empty.js');
+const alias = {
+  crypto: shim('crypto.js'),
+  'node:crypto': shim('crypto.js'),
+  zlib: shim('zlib.js'),
+  'node:zlib': shim('zlib.js'),
+  events: shim('events.js'),
+  'node:events': shim('events.js'),
+  'node:timers/promises': shim('timers.js'),
+};
+for (const name of ['fs', 'path', 'os', 'net', 'node:net', 'http', 'node:http', 'https', 'node:https',
+  'socks', 'node-localstorage', 'ws']) {
+  alias[name] = unavailable;
+}
 
-const common = {
-  bundle: true,
-  minify: true,
-  format: 'iife',
-  platform: 'browser',
-  alias: {
-    buffer: 'buffer/',
-    // Real shims for Node built-ins teleproto actually uses:
-    crypto: join(src, 'shims', 'crypto.js'),
-    'node:crypto': join(src, 'shims', 'crypto.js'),
-    zlib: join(src, 'shims', 'zlib.js'),
-    'node:zlib': join(src, 'shims', 'zlib.js'),
-    events: join(src, 'shims', 'events.js'),
-    'node:events': join(src, 'shims', 'events.js'),
-    'node:timers/promises': join(src, 'shims', 'timers.js'),
-    // Empty stubs for Node built-ins only used by code paths we never hit
-    // (file uploads/downloads, StoreSession, proxies):
-    net: empty,
-    'node:net': empty,
-    tls: empty,
-    os: empty,
-    fs: empty,
-    path: empty,
-    http: empty,
-    'node:http': empty,
-    https: empty,
-    'node:https': empty,
-    socks: empty,
-    'node-localstorage': empty,
+const useFakeClient = {
+  name: 'fake-client',
+  setup(context) {
+    context.onResolve({ filter: /\/tg\/client\.js$/ }, () => ({ path: join(root, 'tests', 'fake-tg.js') }));
   },
-  define: {
-    'process.env.NODE_ENV': '"production"',
-    global: 'globalThis',
-  },
-  inject: [join(src, 'buffer-inject.js')],
-  logLevel: 'info',
 };
 
-// 1. teleproto engine bundle (lazy-loaded)
-await esbuild.build({
-  ...common,
-  entryPoints: [join(src, 'vendor.js')],
-  outfile: join(out, 'vendor.js'),
+rmSync(out, { recursive: true, force: true });
+mkdirSync(out, { recursive: true });
+
+const result = await build({
+  entryPoints: [join(app, 'src', 'main.js')],
+  outdir: out,
+  bundle: true,
+  splitting: true,
+  format: 'esm',
+  platform: 'browser',
+  target: 'chrome110',
+  minify: true,
+  chunkNames: 'chunks/[name]-[hash]',
+  alias,
+  define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"' },
+  plugins: fake ? [useFakeClient] : [],
+  metafile: true,
+  logLevel: 'warning',
 });
 
-// 2. app shell
-await esbuild.build({
-  ...common,
-  entryPoints: [join(src, 'app.js')],
-  outfile: join(out, 'app.js'),
-});
+cpSync(join(app, 'index.html'), join(out, 'index.html'));
+cpSync(join(app, 'app.css'), join(out, 'app.css'));
+cpSync(join(app, 'public'), out, { recursive: true });
 
-// 3. static assets
-copyFileSync(join(root, 'glasses', 'index.html'), join(out, 'index.html'));
-copyFileSync(join(root, 'glasses', 'app.css'), join(out, 'app.css'));
-copyFileSync(join(root, 'glasses', 'favicon.svg'), join(out, 'favicon.svg'));
-
-// 4. runtime config (API credentials — required for any MTProto client)
-writeFileSync(
-  join(out, 'config.js'),
-  `window.CONFIG = { API_ID: ${process.env.TG_API_ID || 33302743}, API_HASH: "${
-    process.env.TG_API_HASH || 'c13e1ca4e9e60304241452b8c157818d'
-  }" };\n`
-);
-
-console.log('Glasses app built to docs/');
+for (const [file, { bytes }] of Object.entries(result.metafile.outputs)) {
+  console.log(`${(bytes / 1024).toFixed(1).padStart(8)} KB  ${file.replace(`${root}/`, '')}`);
+}
