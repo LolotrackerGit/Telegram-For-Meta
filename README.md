@@ -1,95 +1,88 @@
-# Meta Display Telegram Viewer
+# TG Occhiali
 
-A Telegram web client built for **Meta Ray-Ban Display glasses** and for
-desktop browsers.
+Client Telegram non ufficiale per **Meta Ray-Ban Display**. È un sito di soli file statici: si collega direttamente a Telegram dal browser degli occhiali (MTProto via WebSocket), senza server.
 
-- **Glasses app** (`docs/`, hosted on GitHub Pages) — runs fully client-side
-  (MTProto over WebSocket), sized for the 600×600 additive display, with
-  D-pad focus navigation for the EMG wristband.
-- **Desktop/server viewer** (`server.js`) — the original Express + teleproto
-  viewer with QR login, useful on a PC.
+**Indirizzo:** <https://lolotrackergit.github.io/Telegram-For-Meta/>
 
-**Glasses app URL: https://gio53.github.io/meta-display-telegram-viewer/**
+## 1. Ottieni api_id e api_hash
 
-```
-┌─────────┬──────────────────────────────┐
-│ Contacts│                              │
-│   ▼     │            Chat              │
-│  [AB]   │                              │
-│  Alice  │                              │
-│  [CD]   ├──────────────────────────────┤
-│  Bob    │        Type Message          │
-└─────────┴──────────────────────────────┘
+Ogni utente usa le proprie chiavi: nel codice non ce ne sono.
+
+1. Apri <https://my.telegram.org> e accedi col tuo numero.
+2. Scegli **API development tools** e crea un'app.
+3. Copia `api_id` (un numero) e `api_hash` (32 caratteri).
+
+## 2. Costruisci l'URL
+
+Aggiungi le chiavi dopo il `#`, senza spazi:
+
+```text
+https://lolotrackergit.github.io/Telegram-For-Meta/#api_id=IL_TUO_API_ID&api_hash=IL_TUO_API_HASH
 ```
 
-## Add it to your glasses
+Quello che segue il `#` non viene inviato a GitHub. L'app salva i valori in `localStorage` e toglie il frammento dalla barra degli indirizzi.
 
-1. Open the **Meta AI app** on your phone
-2. Go to **Devices → Display Glasses settings**
-3. Navigate to **App connections → Web apps → Add a web app**
-4. Enter the name `TG Viewer` and the URL above
+Tieni l'URL per te, perché contiene le tue chiavi. Se il frammento non arrivasse all'app, la schermata **Configurazione** permette di inserirle a mano.
 
-On the glasses: sign in once with your Telegram phone number (the login code
-arrives in Telegram on your phone — type it with the glasses voice/handwriting
-input). The session is stored in the browser's `localStorage`, so you stay
-signed in. 2FA is supported.
+## 3. Aggiungi la Web App agli occhiali
 
-### Controls (D-pad / EMG wristband)
+1. Attiva la **Modalità sviluppatore** nell'app Meta AI.
+2. Apri **App Settings** nel pannello sinistro, poi **Apps**.
+3. Tocca **Web Apps** → **Connect Web App**, incolla l'URL del punto 2 e tocca **Save**.
 
-- **Left / Right** — move between regions: Contacts → Chat → Composer
-- **Up / Down** — move through contacts (in Contacts) or scroll (in Chat)
-- **Enter (pinch)** — open the selected contact / press Send
-- Focus an input to type by voice; **Esc** leaves the input
+L'app compare in fondo alla griglia e si può fissare.
 
-### Display compliance (per Meta's Web App constraints)
+## 4. Accedi
 
-- 600×600 responsive layout, true-black background (black is transparent on
-  the additive display)
-- Tiny shell first load (~40 KB, 5 requests); the MTProto engine (`vendor.js`)
-  is lazy-loaded after first paint — the first load is slow (the glasses link
-  is slow), but the browser caches it afterwards
-- Arrow-key navigation mirrors D-pad input; Enter activates
+- **Numero di telefono (metodo principale):** scrivi numero, codice ed eventuale password di verifica in due passaggi con il compositore di sistema. Senza prefisso si assume +39.
+- **QR (opzione secondaria, comodo dal Mac):** Telegram sul telefono → Impostazioni → Dispositivi → Collega dispositivo desktop.
 
-## Development
+La password di verifica in due passaggi usa un campo di testo normale, perché `type=password` non apre il compositore: resta visibile mentre la scrivi.
 
-### Glasses app (static, GitHub Pages)
+## Comandi sugli occhiali
+
+| Input | Azione |
+|---|---|
+| Frecce | Spostano il focus; senza elementi in quella direzione scorrono la pagina |
+| Invio | Apre la chat, attiva il campo di testo o il pulsante |
+| Destra dal campo | Porta a **Invia** |
+| Indietro di sistema | Dalla chat torna alla lista |
+
+**Esci** si trova in fondo alla lista, chiede conferma e chiude la sessione anche su Telegram.
+
+## Sicurezza
+
+- La sessione Telegram e le chiavi stanno in `localStorage`. Meta sconsiglia Web Storage per i segreti, ma un sito statico non ha un'alternativa protetta.
+- L'origine `lolotrackergit.github.io` è condivisa da tutti i progetti Pages di questo account: **non pubblicare lì codice non fidato**, perché potrebbe leggere la sessione.
+- La Content Security Policy consente script solo da questo sito e connessioni solo a Telegram. Include `'unsafe-eval'` perché teleproto genera i lettori del protocollo con `new Function`, a partire dallo schema e mai dai messaggi.
+
+## Sviluppo
+
+Serve Node 20 o superiore.
 
 ```bash
 npm install
-npm run build:glasses   # bundles glasses/src + teleproto into docs/
-npx node serve-docs.mjs # serve docs/ at http://localhost:4173
 ```
 
-The bundle aliases Node built-ins to browser shims (`glasses/src/shims`):
-`crypto` → WebCrypto entropy, `zlib` → pako inflate, plus stubs for fs/path/net
-and friends that only file-upload/proxy code paths would use. API credentials
-are written into `docs/config.js` — this is normal for Telegram web clients.
+```bash
+npm run build
+```
 
-Pushing to `main` is enough: GitHub Pages serves the `docs/` folder.
+```bash
+npm run serve
+```
 
-### Desktop/server viewer (optional, for PC)
+`npm run build` genera `docs/`, poi `npm run serve` lo apre su <http://localhost:4173/>. La pagina locale accetta lo stesso frammento `#api_id=…&api_hash=…`. GitHub Pages pubblica `docs/` dal branch `main`.
 
-1. **Get Telegram API credentials** (free, one minute):
-   - Go to <https://my.telegram.org> and log in.
-   - Open **API development tools** and create an app.
-   - Copy the `api_id` and `api_hash`.
+```bash
+npm test
+```
 
-2. **Configure and run:**
+I test usano Chrome a 600×600 con un Telegram finto (`tests/fake-tg.js`, mai incluso in `docs/`) e soli tasti freccia e Invio. Chrome ha bisogno di `--enable-spatial-navigation`, perché su desktop la navigazione spaziale è spenta. Il simulatore Meta invia solo gli eventi dei tasti, quindi non basta per provarla.
 
-   ```bash
-   npm install
-   copy .env.example .env    # Windows (use `cp` on macOS/Linux)
-   # edit .env and paste your TG_API_ID / TG_API_HASH
-   npm start
-   ```
+### Struttura
 
-3. Open `http://localhost:3000`, then scan the QR with
-   **Telegram → Settings → Devices → Link Desktop Device**.
-
-## Notes
-
-- The desktop server binds to `0.0.0.0` so devices on your LAN can reach it.
-  Keep it on a trusted network — anyone on the LAN could open the UI (it is
-  your logged-in Telegram).
-- Only text messages are rendered; media shows as `[media]`.
-- `.env` and `data/` (session files) are gitignored and never committed.
+- `glasses/src/main.js`: avvio e passaggio tra le schermate.
+- `glasses/src/screens/`: configurazione, login, lista chat, conversazione.
+- `glasses/src/tg/client.js`: unico modulo che usa [teleproto](https://github.com/sanyok12345/teleproto), caricato dopo il primo disegno.
+- `glasses/public/`: icona, `.nojekyll` e `.well-known/meta-wearables-manifest.json`. Senza `.nojekyll` GitHub Pages ignorerebbe `.well-known`.
