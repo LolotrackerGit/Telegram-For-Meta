@@ -32,7 +32,7 @@ export function createChatList({ tg, avatars, onOpen, onLogout }) {
   let refreshTimer = null;
   let openChatId = null;
 
-  const list = h('ul');
+  const list = h('ul', { class: 'chat-list' });
   const state = h('p', { class: 'list-state', role: 'status' }, 'Caricamento delle chat…');
   const more = h('button', { type: 'button', hidden: true, onclick: loadMore }, 'Altre chat');
   const exit = h('button', {
