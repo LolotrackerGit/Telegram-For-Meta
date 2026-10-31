@@ -1,7 +1,6 @@
 // Unico modulo che conosce teleproto: le schermate vedono solo oggetti semplici.
 import './shims/globals.js';
 import { Api, Logger, TelegramClient, WebSocketTransport, utils } from 'teleproto';
-import { CustomFile } from 'teleproto/client/uploads';
 import { DeletedMessage, EditedMessage, MessageRead, NewMessage } from 'teleproto/events';
 import { StringSession } from 'teleproto/sessions';
 import bigInt from 'big-integer';
@@ -265,27 +264,6 @@ export async function getHistory(chatId, { beforeId = 0, limit = 30 } = {}) {
 
 export async function sendMessage(chatId, text) {
   const sent = await guarded(() => client.sendMessage(entityToInput(chatId), { message: text }));
-  return toMessage(sent, chatId);
-}
-
-function mediaAttributes({ kind, duration, width, height }) {
-  if (kind === 'voice') return [new Api.DocumentAttributeAudio({ voice: true, duration })];
-  if (kind === 'video' && duration) {
-    return [new Api.DocumentAttributeVideo({ duration, w: width || 640, h: height || 480 })];
-  }
-  return undefined;
-}
-
-export async function sendMedia(chatId, item, onProgress) {
-  const buffer = Buffer.from(await item.blob.arrayBuffer());
-  const sent = await guarded(() => client.sendFile(entityToInput(chatId), {
-    file: new CustomFile(item.name, buffer.length, '', buffer),
-    voiceNote: item.kind === 'voice',
-    forceDocument: item.kind === 'file',
-    attributes: mediaAttributes(item),
-    progressCallback: onProgress,
-    workers: 1,
-  }));
   return toMessage(sent, chatId);
 }
 
