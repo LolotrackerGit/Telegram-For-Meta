@@ -20,7 +20,7 @@ await new Promise((resolve) => setTimeout(resolve, 500));
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: true,
-  args: ['--enable-spatial-navigation'],
+  args: ['--enable-spatial-navigation', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
 });
 
 let failures = 0;
@@ -289,6 +289,116 @@ await scenario('invio fallito: il testo resta nel campo', async (page, context) 
   await press(page, 'ArrowRight', 'Enter');
   await page.waitForSelector('text=Invio non riuscito');
   check(await page.inputValue('textarea') === 'Da non perdere', 'testo perso');
+});
+
+async function openTools(page, context) {
+  await context.grantPermissions(['microphone', 'camera'], { origin: BASE });
+  await openList(page, context);
+  await press(page, 'Enter');
+  await page.waitForSelector('.msg');
+  await press(page, 'ArrowLeft');
+  check(await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Altre opzioni', 'il pulsante + non ha il focus');
+  await press(page, 'Enter');
+  await page.waitForSelector('.tools button');
+}
+
+const lastMedia = async (page) => (await calls(page, 'sendMedia')).at(-1)?.[2];
+
+await scenario('risposte rapide ed emoji da tastiera, senza invio automatico', async (page, context) => {
+  await openTools(page, context);
+  await noHorizontalScroll(page);
+  await screenshot(page, 'opzioni');
+  check(await activeText(page) === 'Ok', `focus su "${await activeText(page)}"`);
+  await press(page, 'Enter');
+  check(await page.inputValue('textarea') === 'Ok', 'risposta non inserita');
+  check(await activeText(page) === 'Invia', 'il focus deve andare su Invia');
+  check((await calls(page, 'sendMessage')).length === 0, 'inviato senza conferma');
+  await press(page, 'Enter');
+  await page.waitForSelector('.msg.out:has-text("Ok")');
+});
+
+await scenario('vocale: registrazione e conversione in Ogg Opus valido', async (page, context) => {
+  await openTools(page, context);
+  await page.locator('.tools button:has-text("🎤 Vocale")').focus();
+  await press(page, 'Enter');
+  await page.waitForSelector('text=Registrazione 0:0');
+  await page.waitForTimeout(1600);
+  await screenshot(page, 'vocale');
+  check(await activeText(page) === 'Invia', 'Invia non ha il focus');
+  await press(page, 'Enter');
+  await page.waitForSelector('.msg.out:has-text("🎤 Vocale")');
+  const media = await lastMedia(page);
+  check(media.kind === 'voice' && media.head === 'OggS' && media.type === 'audio/ogg', `vocale errato: ${JSON.stringify(media)}`);
+  const seconds = await page.evaluate(async () => {
+    const context = new OfflineAudioContext(1, 48000, 48000);
+    const audio = await context.decodeAudioData(await window.fakeTg.lastBlob.arrayBuffer());
+    return audio.duration;
+  });
+  check(seconds > 0.5, `Ogg non decodificabile, durata ${seconds}`);
+  check(await page.isVisible('textarea'), 'campo non ripristinato');
+  check(await activeTag(page) === 'TEXTAREA', 'focus non tornato al campo');
+});
+
+await scenario('foto: scatto, anteprima, invio', async (page, context) => {
+  await openTools(page, context);
+  await page.locator('.tools button:has-text("📷 Foto")').focus();
+  await press(page, 'Enter');
+  await page.waitForSelector('button:text-is("Scatta")');
+  check(await activeText(page) === 'Scatta', 'Scatta non ha il focus');
+  await screenshot(page, 'foto');
+  await press(page, 'Enter');
+  await page.waitForSelector('.capture img');
+  await page.waitForSelector('button:text-is("Invia")');
+  await press(page, 'Enter');
+  await page.waitForSelector('.msg.out:has-text("📷 Foto")');
+  const media = await lastMedia(page);
+  check(media.kind === 'photo' && media.type === 'image/jpeg' && media.size > 1000, JSON.stringify(media));
+});
+
+await scenario('video: registrazione breve e invio', async (page, context) => {
+  await openTools(page, context);
+  await page.locator('.tools button:has-text("🎬 Video")').focus();
+  await press(page, 'Enter');
+  await page.waitForSelector('text=Video 0:0');
+  await page.waitForTimeout(1300);
+  await press(page, 'Enter');
+  await page.waitForSelector('.msg.out:has-text("🎬 Video")');
+  const media = await lastMedia(page);
+  check(media.kind === 'video' && media.size > 1000 && media.duration >= 1, JSON.stringify(media));
+});
+
+await scenario('Indietro durante una registrazione spegne microfono e fotocamera', async (page, context) => {
+  await openTools(page, context);
+  await page.evaluate(() => {
+    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      window.lastStream = await original(constraints);
+      return window.lastStream;
+    };
+  });
+  await page.locator('.tools button:has-text("🎤 Vocale")').focus();
+  await press(page, 'Enter');
+  await page.waitForSelector('text=Registrazione 0:0');
+  await page.goBack();
+  await page.waitForSelector('.chat-row');
+  const live = await page.evaluate(() => window.lastStream.getTracks().filter((track) => track.readyState === 'live').length);
+  check(live === 0, 'microfono ancora acceso');
+  check((await calls(page, 'sendMedia')).length === 0, 'inviato per errore');
+});
+
+await scenario('senza microfono né fotocamera lo spiega e si può tornare indietro', async (page, context) => {
+  await context.addInitScript(() => Object.defineProperty(navigator, 'mediaDevices', { value: undefined }));
+  await openTools(page, context);
+  await page.locator('.tools button:has-text("🎤 Vocale")').focus();
+  await press(page, 'Enter');
+  await page.waitForSelector('text=non offre il microfono');
+  check(await activeText(page) === 'Annulla', 'Annulla non ha il focus');
+  await press(page, 'Enter');
+  await page.waitForSelector('textarea');
+  await press(page, 'ArrowLeft', 'Enter');
+  await page.locator('.tools button:has-text("📷 Foto")').focus();
+  await press(page, 'Enter');
+  await page.waitForSelector('text=non offre la fotocamera');
 });
 
 await scenario('reload dentro una chat riparte dalla chat, Indietro torna alla lista', async (page, context) => {

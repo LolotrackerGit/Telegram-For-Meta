@@ -169,6 +169,35 @@ export async function sendMessage(chatId, text) {
   return message;
 }
 
+export async function sendMedia(chatId, item, onProgress) {
+  const bytes = new Uint8Array(await item.blob.arrayBuffer());
+  calls.push(['sendMedia', chatId, {
+    kind: item.kind,
+    name: item.name,
+    type: item.blob.type,
+    size: bytes.length,
+    duration: item.duration,
+    head: String.fromCharCode(...bytes.slice(0, 4)),
+  }]);
+  window.fakeTg.lastBlob = item.blob;
+  onProgress(0.5);
+  onProgress(1);
+  const labels = { voice: '🎤 Vocale', photo: '📷 Foto', video: '🎬 Video', file: '📎 File' };
+  const message = {
+    id: (nextId += 1),
+    chatId,
+    out: true,
+    senderId: 'self',
+    senderName: 'Tu',
+    date: Math.floor(Date.now() / 1000),
+    edited: false,
+    text: '',
+    media: labels[item.kind],
+  };
+  histories.get(chatId).push(message);
+  return message;
+}
+
 export async function markRead(chatId, maxId) {
   calls.push(['markRead', chatId, maxId]);
 }

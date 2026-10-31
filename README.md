@@ -50,6 +50,15 @@ La password di verifica in due passaggi usa un campo di testo normale, perché `
 
 **Esci** si trova in fondo alla lista, chiede conferma e chiude la sessione anche su Telegram.
 
+## Scrivere e allegare
+
+Le opzioni del compositore di sistema (scrittura neurale, dettatura, tastiera) dipendono dagli occhiali e dalla loro lingua: una Web App non può aggiungerne. Per questo il pulsante **+**, a sinistra del campo, apre un pannello interno all'app:
+
+- **Risposte rapide ed emoji:** finiscono nel campo e il focus passa su **Invia**, così non parte nulla per errore.
+- **🎤 Vocale, 📷 Foto, 🎬 Video (massimo 15 secondi), 📁 File (massimo 50 MB).**
+
+La documentazione Meta non cita fotocamera, microfono o selezione di file per le Web App. L'app prova ad usarli e, se il dispositivo non li offre, lo dice sullo schermo. Su Chrome per computer funzionano tutti.
+
 ## Sicurezza
 
 - La sessione Telegram e le chiavi stanno in `localStorage`. Meta sconsiglia Web Storage per i segreti, ma un sito statico non ha un'alternativa protetta.

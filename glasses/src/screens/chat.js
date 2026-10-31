@@ -1,9 +1,19 @@
+import { createCapture } from '../capture.js';
 import { h } from '../dom.js';
 import { formatDay, formatTime, isSameDay } from '../format.js';
 
 const PAGE = 30;
 const GROUP_GAP_SECONDS = 600;
 const NEAR_BOTTOM_PX = 80;
+
+const QUICK_REPLIES = ['Ok', 'Sì', 'No', 'Arrivo', 'Ti chiamo dopo', 'Grazie'];
+const QUICK_EMOJI = ['👍', '❤️', '😂', '😮', '😢', '🙏', '👋', '🔥'];
+const MEDIA_ACTIONS = [
+  ['voice', '🎤 Vocale'],
+  ['photo', '📷 Foto'],
+  ['video', '🎬 Video'],
+  ['file', '📁 File'],
+];
 
 const root = document.documentElement;
 
@@ -29,7 +39,8 @@ function createMessage(message) {
   const day = h('p', { class: 'day', hidden: true });
   const sender = h('span', { class: 'msg-sender', hidden: true });
   const body = h('span', { class: 'msg-text' });
-  const element = h('div', { class: message.out ? 'msg out' : 'msg' }, day, sender, body);
+  const bubble = h('div', { class: 'bubble' }, sender, body);
+  const element = h('div', { class: message.out ? 'msg out' : 'msg' }, day, bubble);
   fillBody(body, message);
   return { message, element, day, sender, body };
 }
@@ -76,12 +87,68 @@ export function createChatView({ tg, onRead }) {
     onchange: onDraft,
   });
   const sendButton = h('button', { type: 'button', onclick: send }, 'Invia');
+  const moreButton = h('button', {
+    type: 'button',
+    class: 'more',
+    'aria-label': 'Altre opzioni',
+    'aria-expanded': 'false',
+    onclick: toggleTools,
+  }, '+');
+  const chips = (items, action) => h('div', { class: 'chips' }, ...items.map((text) => h('button', {
+    type: 'button',
+    onclick: () => action(text),
+  }, text)));
+  const tools = h('div', { class: 'tools', hidden: true },
+    chips(QUICK_REPLIES, insertText),
+    chips(QUICK_EMOJI, insertText),
+    h('div', { class: 'chips' }, ...MEDIA_ACTIONS.map(([kind, label]) => h('button', {
+      type: 'button',
+      onclick: () => startCapture(kind),
+    }, label))));
+  const composer = h('div', { class: 'composer' }, moreButton, field, sendButton);
+  const capture = createCapture({
+    send: async (item, onProgress) => {
+      const target = chatId;
+      const message = await tg.sendMedia(target, item, onProgress);
+      if (target === chatId) {
+        append(message);
+        scrollToEnd();
+      }
+    },
+    onClose: () => {
+      composer.hidden = false;
+      field.focus({ preventScroll: true });
+    },
+  });
   const element = h('section', { class: 'chat', hidden: true },
     h('header', { class: 'topbar' }, title),
     h('div', { class: 'messages' }, older, list),
-    newBelow,
-    error,
-    h('div', { class: 'composer' }, field, sendButton));
+    h('footer', { class: 'dock' }, newBelow, error, capture.element, tools, composer));
+
+  function setToolsOpen(open) {
+    tools.hidden = !open;
+    moreButton.textContent = open ? '×' : '+';
+    moreButton.setAttribute('aria-expanded', String(open));
+  }
+
+  function toggleTools() {
+    setToolsOpen(tools.hidden);
+    if (!tools.hidden) tools.querySelector('button').focus({ preventScroll: true });
+  }
+
+  // Le frasi pronte finiscono nel campo: l'invio resta una scelta esplicita.
+  function insertText(text) {
+    draft = draft.trim() ? `${draft.trim()} ${text}` : text;
+    field.value = draft;
+    setToolsOpen(false);
+    sendButton.focus({ preventScroll: true });
+  }
+
+  function startCapture(kind) {
+    setToolsOpen(false);
+    composer.hidden = true;
+    capture.start(kind);
+  }
 
   const observer = new IntersectionObserver(([entry]) => {
     if (entry.isIntersecting) loadOlder();
@@ -219,6 +286,8 @@ export function createChatView({ tg, onRead }) {
   function close() {
     if (chatId === null) return;
     drafts.set(chatId, draft);
+    capture.cancel();
+    setToolsOpen(false);
     session += 1;
     observer.unobserve(older);
     chatId = null;
