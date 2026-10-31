@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "name": "TG Occhiali",
+  "description": "Client Telegram non ufficiale per Meta Ray-Ban Display.",
+  "appearance": {
+    "theme_color": "#3A9BD9",
+    "icon": {
+      "src": "../icon.png",
+      "type": "monochrome"
+    }
+  }
+}

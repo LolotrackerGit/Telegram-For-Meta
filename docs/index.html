@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>TG Occhiali</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Client Telegram non ufficiale per Meta Ray-Ban Display">
+  <meta name="application-name" content="TG Occhiali">
+  <meta name="mrbd-web-app-capable" content="yes">
+  <meta name="theme-color" content="#000000">
+  <!-- unsafe-eval: teleproto genera i lettori TL dallo schema con new Function, e abilita WebAssembly per la crittografia -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' wss://*.web.telegram.org; base-uri 'none'; form-action 'none'">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <p id="net" role="status" hidden></p>
+  <div id="app"><div class="form"><p role="status">Caricamento…</p></div></div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

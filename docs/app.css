@@ -1,0 +1,398 @@
+:root {
+  color-scheme: dark;
+  --fg: #f4f4f4;
+  --muted: #bdbdbd;
+  --line: #4a4a4a;
+  --accent: #8fd3ff;
+  --warn: #ffd27a;
+  --header: 40px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #000;
+  scroll-padding-block: calc(var(--header) + 8px) 84px;
+}
+
+body {
+  margin: 0;
+  background: #000;
+  color: var(--fg);
+  font: 400 1rem/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+h1,
+h2,
+p,
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+input,
+textarea {
+  background: #000;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  min-height: 44px;
+}
+
+button {
+  padding: 6px 14px;
+  font-weight: 600;
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 8px 10px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--fg);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Barra di stato della rete */
+#net {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 3;
+  padding: 2px 12px;
+  background: #000;
+  border-block-end: 2px solid var(--warn);
+  color: var(--warn);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* Schermate a modulo: setup, login, errori */
+.form {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  min-block-size: 100dvh;
+  padding: 20px 32px;
+}
+
+.form h1 {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.form label {
+  display: grid;
+  gap: 4px;
+}
+
+.form .steps {
+  display: grid;
+  gap: 4px;
+  list-style: decimal inside;
+}
+
+.form .note {
+  color: var(--warn);
+  font-size: 0.9375rem;
+}
+
+.form .error {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.form .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Il pulsante principale occupa la riga: Giù dal campo arriva subito a lui. */
+.form .actions button {
+  flex: 1;
+}
+
+.form .actions button:first-child {
+  flex-basis: 100%;
+}
+
+.qr {
+  justify-self: center;
+  block-size: min(62dvh, 360px);
+  inline-size: min(62dvh, 360px);
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.qr img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  image-rendering: pixelated;
+}
+
+/* Lista chat */
+.topbar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  block-size: var(--header);
+  padding-inline: 12px;
+  background: #000;
+  border-block-end: 1px solid var(--line);
+}
+
+.topbar h1 {
+  overflow: hidden;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  inline-size: 100%;
+  min-block-size: 64px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+  font-weight: 400;
+  text-align: start;
+}
+
+.chat-row:focus-visible {
+  outline-offset: -3px;
+}
+
+.avatar {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  inline-size: 48px;
+  block-size: 48px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.avatar img {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.chat-main {
+  flex: 1;
+  display: grid;
+  gap: 1px;
+  min-inline-size: 0;
+}
+
+.chat-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+.chat-name,
+.chat-preview {
+  flex: 1;
+  overflow: hidden;
+  min-inline-size: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chat-name {
+  font-weight: 600;
+}
+
+.chat-preview,
+.chat-time {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.chat-time {
+  flex: none;
+}
+
+.chat-badge {
+  flex: none;
+  min-inline-size: 24px;
+  padding-inline: 6px;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.list-end {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.list-state {
+  padding: 24px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Conversazione: il documento è l'unico scroller */
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100dvh;
+}
+
+.messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6px 12px;
+  overflow-anchor: none;
+  font-size: 1rem;
+  line-height: 1.32;
+}
+
+.older {
+  padding-block: 4px 8px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.day {
+  padding-block: 8px 2px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.msg {
+  padding-block: 1px;
+}
+
+.msg-text {
+  white-space: pre-wrap;
+}
+
+.msg.first {
+  padding-block-start: 8px;
+}
+
+.msg-sender {
+  display: block;
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.msg.out .msg-sender {
+  color: var(--muted);
+}
+
+.msg-media {
+  color: var(--accent);
+}
+
+.msg-time {
+  margin-inline-start: 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.msg-edited::after {
+  content: " · modificato";
+}
+
+.new-below {
+  position: sticky;
+  inset-block-end: 68px;
+  align-self: center;
+  padding: 2px 10px;
+  background: #000;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  color: var(--accent);
+  font-size: 0.875rem;
+}
+
+.composer {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #000;
+  border-block-start: 1px solid var(--line);
+}
+
+.composer textarea {
+  flex: 1;
+  field-sizing: content;
+  min-inline-size: 0;
+  max-block-size: 5.2em;
+  resize: none;
+}
+
+@supports not (field-sizing: content) {
+  .composer textarea {
+    block-size: 2.9em;
+  }
+}
+
+.composer-error {
+  padding: 2px 12px;
+  background: #000;
+  color: var(--warn);
+  font-size: 0.875rem;
+}
