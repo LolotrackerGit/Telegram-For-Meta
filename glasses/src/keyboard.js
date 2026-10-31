@@ -2,10 +2,12 @@ import { h } from './dom.js';
 
 export const DEFAULT_LAYOUT = 'ru';
 
+// Ogni layout riempie 12 colonne per 3 righe: con le tastiere sfalsate
+// Su e Giù procederebbero in diagonale.
 const LAYOUTS = {
-  ru: { name: 'RU', rows: ['йцукенгшщзхъ', 'фывапролджэ', 'ячсмитьбюё'] },
-  abc: { name: 'ABC', rows: ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'] },
-  num: { name: '123', rows: ['1234567890', '.,!?:;-()"', '\'@#/€%àèéìòù'] },
+  ru: { name: 'RU', keys: 'йцукенгшщзхъфывапролджэ.ячсмитьбюё,?' },
+  abc: { name: 'ABC', keys: 'qwertyuiop\'-asdfghjkl.,?zxcvbnm!:;()' },
+  num: { name: '123', keys: '1234567890.,!?:;-()"\'@#/€%àèéìòù+=*_' },
 };
 const ORDER = Object.keys(LAYOUTS);
 
@@ -20,12 +22,11 @@ export function createKeyboard({ getText, onInsert, onDelete, onLayout, onClose 
   const layoutKey = h('button', { type: 'button', class: 'key', onclick: nextLayout });
   const element = h('div', { class: 'keyboard', hidden: true },
     rows,
-    h('div', { class: 'keyboard-row' },
-      shiftKey,
-      layoutKey,
-      h('button', { type: 'button', class: 'key key-wide', onclick: () => type(' ') }, 'Spazio'),
-      h('button', { type: 'button', class: 'key', 'aria-label': 'Cancella', onclick: erase }, '⌫'),
-      h('button', { type: 'button', class: 'key', onclick: () => onClose() }, 'Chiudi')));
+    shiftKey,
+    layoutKey,
+    h('button', { type: 'button', class: 'key key-wide', onclick: () => type(' ') }, 'Spazio'),
+    h('button', { type: 'button', class: 'key', 'aria-label': 'Cancella', onclick: erase }, '⌫'),
+    h('button', { type: 'button', class: 'key', onclick: () => onClose() }, 'Chiudi'));
 
   // La prima lettera del messaggio è maiuscola da sola.
   function isUpper() {
@@ -64,12 +65,11 @@ export function createKeyboard({ getText, onInsert, onDelete, onLayout, onClose 
 
   function setLayout(next) {
     layout = next;
-    rows.replaceChildren(...LAYOUTS[next].rows.map((row) => h('div', { class: 'keyboard-row' },
-      ...Array.from(row, (char) => {
-        const key = h('button', { type: 'button', class: 'key', onclick: () => pressLetter(key) });
-        key.dataset.char = char;
-        return key;
-      }))));
+    rows.replaceChildren(...Array.from(LAYOUTS[next].keys, (char) => {
+      const key = h('button', { type: 'button', class: 'key', onclick: () => pressLetter(key) });
+      key.dataset.char = char;
+      return key;
+    }));
     layoutKey.textContent = LAYOUTS[ORDER[(ORDER.indexOf(next) + 1) % ORDER.length]].name;
     layoutKey.setAttribute('aria-label', `Layout ${LAYOUTS[next].name}, passa al successivo`);
     refreshKeys();

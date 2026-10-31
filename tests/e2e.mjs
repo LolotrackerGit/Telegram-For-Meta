@@ -414,6 +414,36 @@ await scenario('tutti i tasti di ogni layout si raggiungono con le frecce', asyn
   }
 });
 
+await scenario('colonne allineate: Giù scende sempre nella stessa colonna', async (page, context) => {
+  await openChat(page, context);
+  await openKeyboard(page);
+  const keys = page.locator('.keyboard-rows button');
+  for (const next of ['ABC', '123', 'RU']) {
+    check(await keys.count() === 36, `tasti: ${await keys.count()}`);
+    const boxes = await keys.evaluateAll((items) => items.map((item) => item.getBoundingClientRect().toJSON()));
+    for (let index = 0; index < 36; index += 1) {
+      const row = Math.floor(index / 12);
+      check(Math.abs(boxes[index].left - boxes[index % 12].left) < 1, `tasto ${index} fuori colonna`);
+      check(Math.abs(boxes[index].top - boxes[row * 12].top) < 1, `tasto ${index} fuori riga`);
+    }
+    for (let column = 0; column < 12; column += 1) {
+      await keys.nth(column).focus();
+      for (const row of [1, 2]) {
+        await press(page, 'ArrowDown');
+        const same = await keys.nth(row * 12 + column).evaluate((item) => item === document.activeElement);
+        check(same, `Giù dalla colonna ${column} non arriva alla riga ${row}`);
+      }
+      for (const row of [1, 0]) {
+        await press(page, 'ArrowUp');
+        const same = await keys.nth(row * 12 + column).evaluate((item) => item === document.activeElement);
+        check(same, `Su dalla colonna ${column} non arriva alla riga ${row}`);
+      }
+    }
+    await page.locator('.keyboard button').filter({ hasText: new RegExp(`^${next}$`) }).focus();
+    await press(page, 'Enter');
+  }
+});
+
 await scenario('il layout resta nella chat e cambia le risposte rapide', async (page, context) => {
   await openChat(page, context);
   await openKeyboard(page);

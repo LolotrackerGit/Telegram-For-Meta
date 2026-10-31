@@ -56,7 +56,8 @@ Il campo apre il compositore degli occhiali, ma le sue opzioni dipendono dal sis
 
 **⌨ Tastiera dell'app** (Sinistra dal campo): scrive direttamente nel campo, senza aprire il compositore.
 
-- Tre layout: **RU** (ЙЦУКЕН), **ABC** e **123** con punteggiatura e accentate. Il tasto a fianco di `Aa` passa al successivo.
+- Tre layout: **RU** (ordine ЙЦУКЕН), **ABC** e **123** con punteggiatura e accentate. Il tasto a fianco di `Aa` passa al successivo.
+- I tasti sono su una griglia di 12 colonne: ognuno sta esattamente sotto quello della riga sopra, così Su e Giù non vanno in diagonale.
 - `Aa` rende maiuscola la lettera successiva; la prima lettera del messaggio lo è da sola.
 - Il focus resta sul tasto premuto. Giù dall'ultima riga porta alla barra con **Invia**.
 - L'app ricorda l'ultimo layout di ogni chat: nelle conversazioni russe si riapre in RU.
