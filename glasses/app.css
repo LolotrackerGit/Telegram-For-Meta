@@ -1,316 +1,398 @@
-/* TG Viewer for Meta Ray-Ban Display — 600x600, additive display.
-   True black stays (black is transparent on the additive display).
-   Visual language: Telegram dark theme — purple outgoing bubbles,
-   colored avatar circles, pill day separators, soft rounded panels. */
-
 :root {
-  --bg: #000000;
-  --rail: #0b0b10;
-  --panel: #0e0e13;
-  --panel-border: #23232b;
-  --bubble-in: #1e1e24;
-  --bubble-out: #7a6fc4;
-  --accent: #8774e1;
-  --accent-deep: #5f4dd0;
-  --online: #4fadf5;
-  --text: #f5f5f5;
-  --muted: #9d9da7;
-  --time-in: #8a8a94;
-  --time-out: rgba(255, 255, 255, 0.65);
+  color-scheme: dark;
+  --fg: #f4f4f4;
+  --muted: #bdbdbd;
+  --line: #4a4a4a;
+  --accent: #8fd3ff;
+  --warn: #ffd27a;
+  --header: 40px;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-html, body {
-  height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 18px;
-  overflow: hidden;
+* {
+  box-sizing: border-box;
 }
 
-.hidden { display: none !important; }
-
-/* ---------- screens ---------- */
-.screen {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 24px;
-  text-align: center;
+html {
+  background: #000;
+  scroll-padding-block: calc(var(--header) + 8px) 84px;
 }
 
-.app-logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: linear-gradient(150deg, #8774e1, #5f4dd0);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 4px;
-  box-shadow: 0 0 24px rgba(135, 116, 225, 0.35);
+body {
+  margin: 0;
+  background: #000;
+  color: var(--fg);
+  font: 400 1rem/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow-wrap: anywhere;
 }
-.app-logo svg { width: 34px; height: 34px; }
 
-.screen h1 { font-size: 1.5rem; letter-spacing: 0.2px; }
+h1,
+h2,
+p,
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
 
-.hint { color: var(--muted); font-size: 0.85rem; max-width: 90%; }
-.error { color: #ff8a80; font-size: 0.9rem; min-height: 1.2em; }
+ul,
+ol {
+  list-style: none;
+}
 
-input {
-  background: #17171d;
-  border: 2px solid #2c2c35;
-  border-radius: 24px;
-  color: var(--text);
-  padding: 12px 18px;
-  font-size: 1rem;
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+input,
+textarea {
+  background: #000;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  min-height: 44px;
+}
+
+button {
+  padding: 6px 14px;
+  font-weight: 600;
+}
+
+input,
+textarea {
   width: 100%;
+  padding: 8px 10px;
 }
-input:focus { outline: none; border-color: var(--accent); }
 
-.btn {
-  background: linear-gradient(150deg, var(--accent), var(--accent-deep));
-  color: #fff;
+:focus-visible {
+  outline: 3px solid var(--fg);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Barra di stato della rete */
+#net {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 3;
+  padding: 2px 12px;
+  background: #000;
+  border-block-end: 2px solid var(--warn);
+  color: var(--warn);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* Schermate a modulo: setup, login, errori */
+.form {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  min-block-size: 100dvh;
+  padding: 20px 32px;
+}
+
+.form h1 {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.form label {
+  display: grid;
+  gap: 4px;
+}
+
+.form .steps {
+  display: grid;
+  gap: 4px;
+  list-style: decimal inside;
+}
+
+.form .note {
+  color: var(--warn);
+  font-size: 0.9375rem;
+}
+
+.form .error {
+  color: var(--warn);
   font-weight: 600;
-  border: none;
-  border-radius: 24px;
-  padding: 12px 26px;
-  font-size: 1rem;
-  cursor: pointer;
-}
-#login input, #login .btn { width: 300px; max-width: 90%; }
-
-/* ---------- main layout ---------- */
-#app {
-  display: flex;
-  gap: 8px;
-  height: 100vh;
-  padding: 8px;
 }
 
-/* contacts rail — Telegram sidebar */
-#contacts {
-  flex: 0 0 86px;
+.form .actions {
   display: flex;
-  flex-direction: column;
-  background: var(--rail);
-  border: 1px solid var(--panel-border);
-  border-radius: 18px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Il pulsante principale occupa la riga: Giù dal campo arriva subito a lui. */
+.form .actions button {
+  flex: 1;
+}
+
+.form .actions button:first-child {
+  flex-basis: 100%;
+}
+
+.qr {
+  justify-self: center;
+  block-size: min(62dvh, 360px);
+  inline-size: min(62dvh, 360px);
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.qr img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  image-rendering: pixelated;
+}
+
+/* Lista chat */
+.topbar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  block-size: var(--header);
+  padding-inline: 12px;
+  background: #000;
+  border-block-end: 1px solid var(--line);
+}
+
+.topbar h1 {
   overflow: hidden;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-#contacts-header {
-  padding: 10px 4px 8px;
-  font-size: 0.72rem;
+.chat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  inline-size: 100%;
+  min-block-size: 64px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+  font-weight: 400;
+  text-align: start;
+}
+
+.chat-row:focus-visible {
+  outline-offset: -3px;
+}
+
+.avatar {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  inline-size: 48px;
+  block-size: 48px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.avatar img {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.chat-main {
+  flex: 1;
+  display: grid;
+  gap: 1px;
+  min-inline-size: 0;
+}
+
+.chat-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+.chat-name,
+.chat-preview {
+  flex: 1;
+  overflow: hidden;
+  min-inline-size: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chat-name {
   font-weight: 600;
+}
+
+.chat-preview,
+.chat-time {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.chat-time {
+  flex: none;
+}
+
+.chat-badge {
+  flex: none;
+  min-inline-size: 24px;
+  padding-inline: 6px;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.list-end {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.list-state {
+  padding: 24px 12px;
   color: var(--muted);
   text-align: center;
-  border-bottom: 1px solid #1a1a20;
 }
 
-#contact-list { flex: 1; overflow-y: auto; scrollbar-width: none; }
-#contact-list::-webkit-scrollbar { display: none; }
-
-.contact {
+/* Conversazione: il documento è l'unico scroller */
+.chat {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 9px 2px;
-  cursor: pointer;
-  transition: background 120ms ease;
+  min-block-size: 100dvh;
 }
 
-.contact .avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
+.messages {
+  flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: #fff;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6px 12px;
+  overflow-anchor: none;
+  font-size: 1rem;
+  line-height: 1.32;
 }
 
-.contact .name {
-  font-size: 0.64rem;
+.older {
+  padding-block: 4px 8px;
   color: var(--muted);
-  max-width: 78px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.day {
+  padding-block: 8px 2px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.msg {
+  padding-block: 1px;
+}
+
+.msg-text {
+  white-space: pre-wrap;
+}
+
+.msg.first {
+  padding-block-start: 8px;
+}
+
+.msg-sender {
+  display: block;
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.msg.out .msg-sender {
+  color: var(--muted);
+}
+
+.msg-media {
+  color: var(--accent);
+}
+
+.msg-time {
+  margin-inline-start: 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
   white-space: nowrap;
 }
 
-.contact.selected { background: rgba(135, 116, 225, 0.18); }
-.contact.selected .name { color: var(--text); }
-.contact.selected .avatar { box-shadow: 0 0 0 2px #fff; }
-
-.contact .badge {
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.6rem;
-  font-weight: 700;
-  border-radius: 999px;
-  padding: 1px 6px;
+.msg-edited::after {
+  content: " · modificato";
 }
 
-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* chat panel — the wallpaper moment */
-#chat-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background:
-    radial-gradient(ellipse 90% 60% at 85% 110%, rgba(135, 116, 225, 0.13), transparent),
-    radial-gradient(ellipse 70% 50% at 10% -10%, rgba(79, 173, 245, 0.07), transparent),
-    var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 18px;
-  overflow: hidden;
-  min-height: 0;
-}
-
-#chat-title {
-  padding: 11px 14px;
-  font-weight: 600;
-  font-size: 0.95rem;
-  border-bottom: 1px solid #1a1a20;
-  background: rgba(0, 0, 0, 0.35);
-}
-
-#messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* empty chat state */
-.chat-empty {
-  margin: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-.chat-empty .ring {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: rgba(135, 116, 225, 0.14);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.chat-empty svg { width: 30px; height: 30px; }
-
-/* day separator pill, like Telegram's "Today" */
-.day-sep {
+.new-below {
+  position: sticky;
+  inset-block-end: 68px;
   align-self: center;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid #23232b;
-  color: #cfcfd6;
-  font-size: 0.66rem;
-  font-weight: 500;
-  padding: 3px 12px;
-  border-radius: 999px;
-  margin: 6px 0;
+  padding: 2px 10px;
+  background: #000;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  color: var(--accent);
+  font-size: 0.875rem;
 }
 
-/* bubbles */
-.msg {
-  max-width: 82%;
-  padding: 7px 12px 6px;
-  border-radius: 14px;
-  line-height: 1.35;
-  font-size: 0.95rem;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-  position: relative;
-}
-.msg.in {
-  align-self: flex-start;
-  background: var(--bubble-in);
-  border-bottom-left-radius: 5px;
-}
-.msg.out {
-  align-self: flex-end;
-  background: var(--bubble-out);
-  border-bottom-right-radius: 5px;
-  box-shadow: 0 2px 8px rgba(122, 111, 196, 0.22);
-}
-.msg.first-in  { border-top-left-radius: 5px; }
-.msg.first-out { border-top-right-radius: 5px; }
-
-.msg .sender { font-size: 0.68rem; font-weight: 600; margin-bottom: 1px; }
-.msg .time {
-  font-size: 0.62rem;
-  color: var(--time-in);
-  text-align: right;
-  margin-top: 2px;
-}
-.msg.out .time { color: var(--time-out); }
-.msg.out .sender { color: #efeaff; }
-
-/* composer — Telegram pill + round send */
-#composer { display: flex; gap: 8px; align-items: center; }
-#composer input {
-  flex: 1;
-  border-radius: 24px;
-  padding: 13px 18px;
-  font-size: 1rem;
-  background: #17171d;
-}
-#btn-send {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  padding: 0;
+.composer {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 2;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-#btn-send svg { width: 20px; height: 20px; }
-
-/* ---------- D-pad focus ---------- */
-:focus { outline: none; }
-
-#contact-list.dp-focus .contact.selected {
-  background: rgba(135, 116, 225, 0.28);
-  box-shadow: inset 0 0 0 2px var(--accent);
-  border-radius: 12px;
-}
-#messages.dp-focus {
-  box-shadow: inset 0 0 0 2px rgba(135, 116, 225, 0.55);
-  border-radius: 12px;
-}
-#composer.dp-focus input {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(135, 116, 225, 0.4);
-}
-#composer.dp-focus #btn-send {
-  box-shadow: 0 0 0 2px rgba(135, 116, 225, 0.4);
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #000;
+  border-block-start: 1px solid var(--line);
 }
 
-@media (max-width: 480px) {
-  #contacts { flex-basis: 72px; }
-  .contact .avatar { width: 38px; height: 38px; font-size: 0.85rem; }
+.composer textarea {
+  flex: 1;
+  field-sizing: content;
+  min-inline-size: 0;
+  max-block-size: 5.2em;
+  resize: none;
+}
+
+@supports not (field-sizing: content) {
+  .composer textarea {
+    block-size: 2.9em;
+  }
+}
+
+.composer-error {
+  padding: 2px 12px;
+  background: #000;
+  color: var(--warn);
+  font-size: 0.875rem;
 }
