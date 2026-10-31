@@ -450,30 +450,39 @@ textarea {
   padding-inline: 8px;
 }
 
-.capture {
+.keyboard,
+.keyboard-rows {
   display: grid;
-  gap: 8px;
-  justify-items: center;
-  padding: 10px 12px;
+  gap: 4px;
 }
 
-.capture video,
-.capture img {
-  block-size: min(46dvh, 270px);
-  max-inline-size: 100%;
-  border-radius: 10px;
-  object-fit: contain;
-  background: #000;
+.keyboard {
+  padding: 8px 12px 0;
 }
 
-.capture-actions {
+.keyboard-row {
   display: flex;
-  gap: 8px;
-  inline-size: 100%;
+  gap: 4px;
 }
 
-.capture-actions button {
-  flex: 1;
+.key {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  min-block-size: 42px;
+  padding: 0 2px;
+  border-width: 1px;
+  border-radius: 8px;
+  font-size: 1.0625rem;
+  font-weight: 500;
+}
+
+.key-wide {
+  flex-grow: 3;
+}
+
+.key-on {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .composer textarea {
