@@ -25,6 +25,7 @@ const browser = await chromium.launch({
 
 let failures = 0;
 async function scenario(name, run) {
+  if (process.env.E2E_ONLY && !name.includes(process.env.E2E_ONLY)) return;
   const context = await browser.newContext({ viewport: { width: 600, height: 600 } });
   const page = await context.newPage();
   const errors = [];
@@ -252,7 +253,7 @@ await scenario('conversazione: apertura, scroll, messaggi vecchi, invio, Indietr
   await press(page, 'ArrowRight');
   check(await activeText(page) === 'Invia', `dopo il campo il focus è su "${await activeText(page)}"`);
   await press(page, 'Enter');
-  await page.waitForSelector('text=Ciao dagli occhiali');
+  await page.waitForSelector('.msg:has-text("Ciao dagli occhiali")');
   await page.waitForTimeout(100);
   check(await page.locator('.msg:has-text("Ciao dagli occhiali")').count() === 1, 'messaggio duplicato');
   check(await page.inputValue('textarea') === '', 'campo non svuotato');
@@ -442,6 +443,47 @@ await scenario('colonne allineate: Giù scende sempre nella stessa colonna', asy
     await page.locator('.keyboard button').filter({ hasText: new RegExp(`^${next}$`) }).focus();
     await press(page, 'Enter');
   }
+});
+
+// La chat deve restare ferma qualunque tasto si prema dentro il pannello aperto.
+async function expectStill(page, keys) {
+  await page.waitForTimeout(150);
+  const position = () => page.evaluate(() => ({
+    y: Math.round(window.scrollY),
+    top: Math.round(document.querySelector('.msg:last-child').getBoundingClientRect().top),
+  }));
+  const start = await position();
+  for (const key of keys) {
+    await press(page, key);
+    await page.waitForTimeout(120);
+    const now = await position();
+    check(now.y === start.y && now.top === start.top, `${key}: la chat si è spostata da ${start.y} a ${now.y}`);
+  }
+}
+
+await scenario('la chat resta ferma mentre ci si muove nei pannelli', async (page, context) => {
+  await openChat(page, context);
+  await page.waitForFunction(() => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2);
+  await openKeyboard(page);
+  const dock = await page.locator('.dock').boundingBox();
+  const last = await page.locator('.msg').last().boundingBox();
+  check(last.y + last.height <= dock.y + 1, 'l’ultimo messaggio resta coperto dalla tastiera');
+  await expectStill(page, [
+    'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowDown', 'ArrowDown', 'ArrowDown',
+    'ArrowDown', 'ArrowUp', 'ArrowUp', 'ArrowUp', 'ArrowUp', 'ArrowUp', 'ArrowUp', 'ArrowLeft',
+  ]);
+  await pressKey(page, 'Chiudi');
+  await page.locator('.more[aria-label="Altre opzioni"]').focus();
+  await press(page, 'Enter');
+  await page.waitForSelector('.tools button');
+  await expectStill(page, ['ArrowRight', 'ArrowRight', 'ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp', 'ArrowUp', 'ArrowUp']);
+  await page.locator('.more[aria-label="Altre opzioni"]').focus();
+  await press(page, 'Enter');
+  await page.waitForSelector('.tools', { state: 'hidden' });
+  await page.locator('textarea').focus();
+  const before = await scrollY(page);
+  await press(page, 'ArrowUp');
+  await page.waitForFunction((y) => window.scrollY < y, before);
 });
 
 await scenario('il layout resta nella chat e cambia le risposte rapide', async (page, context) => {

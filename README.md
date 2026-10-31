@@ -64,6 +64,8 @@ Il campo apre il compositore degli occhiali, ma le sue opzioni dipendono dal sis
 
 **+ Risposte rapide ed emoji:** finiscono nel campo e il focus passa su **Invia**, così non parte nulla per errore. Se l'ultimo layout della chat è RU, le frasi sono in russo.
 
+Mentre uno dei due pannelli è aperto la chat resta ferma: per scorrere i messaggi va chiuso il pannello.
+
 ## Limiti
 
 Gli occhiali non concedono alle Web App fotocamera, microfono e selezione di file: l'app non può inviare foto, video o vocali. Quelli ricevuti compaiono come etichetta (📷 Foto, 🎤 Vocale).

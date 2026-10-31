@@ -129,32 +129,53 @@ export function createChatView({ tg, onRead }) {
     field.scrollTop = field.scrollHeight;
   }
 
+  // Senza altri tasti in una direzione il browser farebbe scorrere la pagina:
+  // finché un pannello è aperto la chat resta ferma.
+  function syncPageLock() {
+    root.classList.toggle('panel-open', !tools.hidden || keyboard.isOpen);
+  }
+
   function setToolsOpen(open) {
     tools.hidden = !open;
     moreButton.textContent = open ? '×' : '+';
     moreButton.setAttribute('aria-expanded', String(open));
+    syncPageLock();
+  }
+
+  // Un pannello copre il fondo della chat: chi era in fondo deve vedere ancora
+  // gli ultimi messaggi.
+  function keepEnd(change) {
+    const follow = isNearBottom();
+    change();
+    if (follow) scrollToEnd();
   }
 
   function toggleTools() {
     const open = tools.hidden;
-    setKeyboardOpen(false);
-    setToolsOpen(open);
-    if (!open) return;
-    const replies = loadChatLayout(chatId) === 'ru' ? QUICK_REPLIES_RU : QUICK_REPLIES;
-    quickReplies.replaceChildren(...replies.map(chip));
-    tools.querySelector('button').focus({ preventScroll: true });
+    keepEnd(() => {
+      setKeyboardOpen(false);
+      if (open) {
+        const replies = loadChatLayout(chatId) === 'ru' ? QUICK_REPLIES_RU : QUICK_REPLIES;
+        quickReplies.replaceChildren(...replies.map(chip));
+      }
+      setToolsOpen(open);
+      if (open) tools.querySelector('button').focus({ preventScroll: true });
+    });
   }
 
   function setKeyboardOpen(open) {
     if (open) keyboard.open(loadChatLayout(chatId));
     else keyboard.close();
     keyboardButton.setAttribute('aria-expanded', String(open));
+    syncPageLock();
   }
 
   function toggleKeyboard() {
     const open = !keyboard.isOpen;
-    setToolsOpen(false);
-    setKeyboardOpen(open);
+    keepEnd(() => {
+      setToolsOpen(false);
+      setKeyboardOpen(open);
+    });
   }
 
   function closeKeyboard() {
