@@ -1,15 +1,33 @@
 :root {
   color-scheme: dark;
-  --fg: #f4f4f4;
-  --muted: #bdbdbd;
-  --line: #4a4a4a;
-  --accent: #8fd3ff;
+  /* Il display è additivo: il nero è trasparente e i toni molto scuri non si
+     vedono, quindi le superfici sono più chiare che in un tema scuro normale. */
+  --fg: #f5f7fa;
+  --muted: #c3ccd5;
+  --line: #46525e;
   --warn: #ffd27a;
   --header: 40px;
-  --surface: #1e1e20;
-  --bubble-in: #2a2a2d;
-  --bubble-out: #17527c;
+  --surface: #2a333d;
+  --surface-raised: #3a4552;
+  --row-focus: #34506a;
+  /* Tinte di Telegram schiarite: per cambiare tema bastano queste quattro. */
+  --accent: #64c3ff;
+  --on-accent: #08202f;
+  --brand: #2596e0;
+  --bubble-out: #2f74ad;
+  --bubble-in: #3d4752;
+  --on-bubble-out: #d8ebfa;
+  --on-bubble-in: #cfd7df;
+  --read: #b4ecff;
 }
+
+.peer-0 { --peer: #ff9aa0; }
+.peer-1 { --peer: #ffc08a; }
+.peer-2 { --peer: #c9bcff; }
+.peer-3 { --peer: #a3e58a; }
+.peer-4 { --peer: #8fe3e5; }
+.peer-5 { --peer: #93cdf5; }
+.peer-6 { --peer: #ffa3cc; }
 
 * {
   box-sizing: border-box;
@@ -57,7 +75,7 @@ textarea {
 button,
 input,
 textarea {
-  background: var(--surface);
+  background: var(--surface-raised);
   border: 2px solid var(--line);
   border-radius: 10px;
   min-height: 44px;
@@ -174,9 +192,8 @@ textarea {
   display: flex;
   align-items: center;
   block-size: var(--header);
-  padding-inline: 12px;
+  padding-inline: 14px;
   background: var(--surface);
-  border-block-end: 1px solid var(--line);
 }
 
 .topbar h1 {
@@ -187,40 +204,39 @@ textarea {
   text-overflow: ellipsis;
 }
 
+/* Lista piatta: il divisore parte dopo l'avatar e il focus evidenzia la riga. */
 .chat-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: stretch;
+  gap: 12px;
   inline-size: 100%;
-  min-block-size: 64px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
+  min-block-size: 68px;
+  padding: 0 0 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font-weight: 400;
   text-align: start;
 }
 
 .chat-row:focus-visible {
+  border-radius: 12px;
+  background: var(--row-focus);
   outline-offset: -3px;
-}
-
-.chat-list {
-  display: grid;
-  gap: 4px;
-  padding: 6px 8px 0;
 }
 
 .avatar {
   position: relative;
   flex: none;
+  align-self: center;
   display: grid;
   place-items: center;
   overflow: hidden;
   inline-size: 48px;
   block-size: 48px;
-  border: 2px solid var(--line);
   border-radius: 50%;
+  background: var(--peer);
+  color: var(--on-accent);
   font-size: 0.9375rem;
   font-weight: 700;
 }
@@ -236,13 +252,20 @@ textarea {
 .chat-main {
   flex: 1;
   display: grid;
-  gap: 1px;
+  align-content: center;
+  gap: 2px;
   min-inline-size: 0;
+  padding: 8px 12px 8px 0;
+  border-block-end: 1px solid var(--line);
+}
+
+.chat-row:focus-visible .chat-main {
+  border-color: transparent;
 }
 
 .chat-line {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   min-inline-size: 0;
 }
@@ -257,7 +280,7 @@ textarea {
 }
 
 .chat-name {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .chat-preview,
@@ -270,16 +293,33 @@ textarea {
   flex: none;
 }
 
+.has-unread .chat-time {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.chat-ticks {
+  flex: none;
+  margin-inline-end: -4px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  letter-spacing: -2px;
+}
+
+.chat-ticks.read {
+  color: var(--accent);
+}
+
 .chat-badge {
   flex: none;
   min-inline-size: 24px;
-  padding-inline: 6px;
-  border: 2px solid var(--accent);
+  padding-inline: 7px;
   border-radius: 12px;
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 0.875rem;
   font-weight: 700;
-  line-height: 20px;
+  line-height: 24px;
   text-align: center;
 }
 
@@ -307,10 +347,10 @@ textarea {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 6px 12px;
+  padding: 6px 14px 10px;
   overflow-anchor: none;
-  font-size: 1rem;
-  line-height: 1.32;
+  font-size: 1.0625rem;
+  line-height: 1.38;
 }
 
 .older {
@@ -322,11 +362,11 @@ textarea {
 
 .day {
   align-self: center;
-  margin-block: 8px 2px;
-  padding: 1px 10px;
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--muted);
+  margin-block: 10px 4px;
+  padding: 2px 12px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--fg);
   font-size: 0.8125rem;
   font-weight: 600;
   text-align: center;
@@ -336,7 +376,11 @@ textarea {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding-block: 1px;
+  padding-block-start: 2px;
+}
+
+.msg.first {
+  padding-block-start: 10px;
 }
 
 .msg.out {
@@ -344,63 +388,98 @@ textarea {
 }
 
 .bubble {
-  max-inline-size: 88%;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px 14px 14px 6px;
+  position: relative;
+  max-inline-size: 80%;
+  padding: 5px 10px;
+  border-radius: 14px;
   background: var(--bubble-in);
 }
 
-.msg.first .bubble {
-  border-start-start-radius: 14px;
-}
-
 .msg.out .bubble {
-  border-color: #3b86ba;
-  border-radius: 14px 6px 6px 14px;
   background: var(--bubble-out);
 }
 
+/* Codina sulla prima bolla di ogni serie */
+.msg.first .bubble {
+  border-start-start-radius: 0;
+}
+
+.msg.first .bubble::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 100%;
+  inline-size: 9px;
+  block-size: 12px;
+  background: inherit;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
 .msg.out.first .bubble {
-  border-start-end-radius: 14px;
+  border-start-start-radius: 14px;
+  border-start-end-radius: 0;
+}
+
+.msg.out.first .bubble::before {
+  inset-inline: 100% auto;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.msg-sender {
+  display: block;
+  color: var(--peer);
+  font-size: 0.875rem;
+  font-weight: 700;
 }
 
 .msg-text {
   white-space: pre-wrap;
 }
 
-.msg.first {
-  padding-block-start: 8px;
-}
-
-.msg-sender {
-  display: block;
-  color: var(--accent);
-  font-size: 0.875rem;
-  font-weight: 700;
-}
-
-.msg.out .msg-sender {
-  color: #cfe8fa;
-}
-
 .msg-media {
-  color: var(--accent);
+  color: var(--on-bubble-in);
 }
 
 .msg.out .msg-media {
-  color: #fff;
+  color: var(--on-bubble-out);
 }
 
-.msg-time {
-  margin-inline-start: 6px;
-  color: #d0d0d0;
+.msg-meta,
+.msg-meta-ghost {
   font-size: 0.75rem;
+  line-height: 1;
   white-space: nowrap;
 }
 
-.msg-edited::after {
-  content: " · modificato";
+.msg-meta {
+  position: absolute;
+  inset-block-end: 6px;
+  inset-inline-end: 10px;
+  color: var(--on-bubble-in);
+}
+
+.msg.out .msg-meta {
+  color: var(--on-bubble-out);
+}
+
+.msg-meta-ghost {
+  display: inline-block;
+  visibility: hidden;
+  margin-inline-start: 4px;
+}
+
+.msg-ticks {
+  margin-inline-start: 4px;
+  letter-spacing: -2px;
+  font-weight: 700;
+}
+
+.msg-ticks.read {
+  color: var(--read);
+}
+
+.msg-edited::before {
+  content: "modificato · ";
 }
 
 .dock {
@@ -408,33 +487,76 @@ textarea {
   inset-block-end: 0;
   z-index: 2;
   display: grid;
-  background: var(--surface);
-  border-block-start: 1px solid var(--line);
+  background: #000;
 }
 
 .new-below {
   justify-self: center;
   margin-block-start: 4px;
-  padding: 2px 10px;
-  border: 2px solid var(--accent);
+  padding: 2px 12px;
   border-radius: 12px;
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
   font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .composer {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 6px 10px 8px;
+}
+
+/* Campo arrotondato con dentro + e tastiera */
+.composer-field {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-inline-size: 0;
+  padding: 3px;
+  border-radius: 23px;
+  background: var(--surface-raised);
 }
 
 .more {
   flex: none;
-  inline-size: 44px;
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  min-height: 40px;
   padding: 0;
-  font-size: 1.375rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.5rem;
   line-height: 1;
+}
+
+.more svg,
+.send svg {
+  inline-size: 24px;
+  block-size: 24px;
+  fill: currentColor;
+}
+
+.send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 46px;
+  min-height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+}
+
+.send.sending {
+  opacity: 0.6;
 }
 
 .tools {
@@ -452,7 +574,9 @@ textarea {
 .chips button {
   flex: 1 1 auto;
   min-inline-size: 44px;
-  padding-inline: 8px;
+  padding-inline: 10px;
+  border: 0;
+  border-radius: 20px;
 }
 
 .keyboard {
@@ -471,7 +595,7 @@ textarea {
   min-inline-size: 0;
   min-block-size: 42px;
   padding: 0;
-  border-width: 1px;
+  border: 0;
   border-radius: 8px;
   font-size: 1.0625rem;
   font-weight: 500;
@@ -486,17 +610,25 @@ textarea {
 }
 
 .key-on {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .composer textarea {
   flex: 1;
   field-sizing: content;
   min-inline-size: 0;
+  min-height: 40px;
   max-block-size: 5.2em;
-  background: #000;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
   resize: none;
+}
+
+.composer textarea:focus-visible {
+  outline-offset: -2px;
 }
 
 @supports not (field-sizing: content) {
