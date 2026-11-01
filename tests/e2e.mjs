@@ -54,6 +54,9 @@ const press = (page, ...keys) => keys.reduce(
 );
 
 const activeText = (page) => page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+// Il pulsante di invio è un'icona: il nome accessibile vale quanto il testo.
+const activeName = (page) => page.evaluate(() => document.activeElement?.getAttribute('aria-label')
+  ?? document.activeElement?.textContent?.trim() ?? '');
 const activeTag = (page) => page.evaluate(() => document.activeElement?.tagName);
 const scrollY = (page) => page.evaluate(() => Math.round(window.scrollY));
 const calls = (page, name) => page.evaluate((call) => window.fakeTg.calls.filter(([n]) => n === call), name);
@@ -177,6 +180,70 @@ await scenario('lista: righe native, frecce, nome lungo senza overflow', async (
   check(box.top >= 40 && box.bottom <= 600, `riga fuori vista: ${box.top}-${box.bottom}`);
 });
 
+await scenario('lista piatta: niente bordi, divisore dopo l’avatar, focus evidente', async (page, context) => {
+  await openList(page, context);
+  const style = (locator) => locator.evaluate((item) => {
+    const css = getComputedStyle(item);
+    return { background: css.backgroundColor, border: css.borderTopWidth, outline: css.outlineStyle };
+  });
+  const rows = page.locator('.chat-row');
+  const focused = await style(rows.nth(0));
+  const idle = await style(rows.nth(3));
+  check(idle.background === 'rgba(0, 0, 0, 0)' && idle.border === '0px', `riga con sfondo o bordo: ${JSON.stringify(idle)}`);
+  check(focused.background !== idle.background && focused.outline === 'solid', 'focus poco visibile');
+  const avatar = await rows.nth(3).locator('.avatar').boundingBox();
+  check(avatar.width === 48 && avatar.height === 48, `avatar ${avatar.width}×${avatar.height}`);
+  const divider = await rows.nth(3).locator('.chat-main').evaluate((item) => ({
+    left: item.getBoundingClientRect().left,
+    width: getComputedStyle(item).borderBottomWidth,
+  }));
+  check(divider.width === '1px' && divider.left > avatar.x + avatar.width, 'il divisore non parte dopo l’avatar');
+  const preview = await rows.nth(1).locator('.chat-preview').evaluate((item) => item.scrollHeight <= 24);
+  check(preview, 'anteprima su più righe');
+});
+
+await scenario('non letti: ora e badge pieno; anteprima di gruppo con il nome', async (page, context) => {
+  await openList(page, context);
+  const unread = page.locator('.chat-row').nth(1);
+  const read = page.locator('.chat-row').nth(4);
+  const color = (locator) => locator.evaluate((item) => getComputedStyle(item).color);
+  check(await color(unread.locator('.chat-time')) !== await color(read.locator('.chat-time')), 'l’ora dei non letti deve cambiare colore');
+  const badge = await unread.locator('.chat-badge').evaluate((item) => {
+    const css = getComputedStyle(item);
+    return { background: css.backgroundColor, color: css.color, text: item.textContent };
+  });
+  check(badge.text === '3' && badge.background !== 'rgba(0, 0, 0, 0)' && badge.background !== badge.color, JSON.stringify(badge));
+  const group = await page.locator('.chat-row').nth(2).locator('.chat-preview').textContent();
+  check(/^(Giulia|Marco|Ivan): /.test(group), `anteprima gruppo: "${group}"`);
+  const direct = await page.locator('.chat-row').nth(4).locator('.chat-preview').textContent();
+  check(!direct.includes(': '), `anteprima privata con nome: "${direct}"`);
+  const channel = await page.locator('.chat-row', { hasText: 'Canale 7' }).locator('.chat-preview').textContent();
+  check(!/^\S+: /.test(channel), `anteprima canale con nome: "${channel}"`);
+  const ticks = (name) => page.locator(`.chat-row[aria-label^="${name}"]`).locator('.chat-ticks');
+  check(await ticks('Contatto 3').first().textContent() === '✓✓', 'spunte lette in lista');
+  check(await ticks('Contatto 6').first().textContent() === '✓', 'spunta inviata in lista');
+  check(await ticks('Contatto 1,').isHidden(), 'spunte su un messaggio altrui');
+  await page.evaluate(() => window.fakeTg.readOutbox('1006', 96));
+  await page.waitForFunction(() => [...document.querySelectorAll('.chat-row')]
+    .find((row) => row.getAttribute('aria-label') === 'Contatto 6').querySelector('.chat-ticks').textContent === '✓✓');
+});
+
+await scenario('avatar: iniziali su cerchio colorato prima della foto', async (page, context) => {
+  await context.addInitScript(() => localStorage.setItem('fake.holdAvatars', '1'));
+  await openList(page, context);
+  await page.waitForFunction(() => window.fakeTg.calls.some(([name]) => name === 'downloadAvatar'));
+  const pending = page.locator('.avatar').first();
+  check(await page.locator('.avatar img').count() === 0, 'immagine prima del download');
+  check((await pending.textContent()) === 'C0', `iniziali: "${await pending.textContent()}"`);
+  const colors = await page.locator('.avatar').evaluateAll((items) => items.slice(0, 7)
+    .map((item) => getComputedStyle(item).backgroundColor));
+  check(colors.every((color) => !['rgba(0, 0, 0, 0)', 'rgb(0, 0, 0)'].includes(color)), `cerchio nero: ${colors}`);
+  check(new Set(colors).size > 1, 'palette non basata sull’id');
+  await screenshot(page, 'lista-iniziali');
+  await page.evaluate(() => window.fakeTg.releaseAvatars());
+  await page.waitForSelector('.avatar img');
+});
+
 await scenario('foto: scaricate solo se in vista e una volta sola', async (page, context) => {
   await openList(page, context);
   await page.waitForSelector('.avatar img');
@@ -251,7 +318,7 @@ await scenario('conversazione: apertura, scroll, messaggi vecchi, invio, Indietr
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await page.keyboard.type('Ciao dagli occhiali');
   await press(page, 'ArrowRight');
-  check(await activeText(page) === 'Invia', `dopo il campo il focus è su "${await activeText(page)}"`);
+  check(await activeName(page) === 'Invia', `dopo il campo il focus è su "${await activeName(page)}"`);
   await press(page, 'Enter');
   await page.waitForSelector('.msg:has-text("Ciao dagli occhiali")');
   await page.waitForTimeout(100);
@@ -308,6 +375,14 @@ async function openChat(page, context) {
 
 const activeLabel = (page) => page.evaluate(() => document.activeElement.getAttribute('aria-label'));
 
+async function openNamedChat(page, context, name) {
+  await openList(page, context);
+  await page.locator('.chat-row', { hasText: name }).first().focus();
+  await press(page, 'Enter');
+  await page.waitForSelector('.msg');
+  await page.waitForFunction(() => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2);
+}
+
 async function openTools(page, context) {
   await openChat(page, context);
   await press(page, 'ArrowLeft', 'ArrowLeft');
@@ -350,10 +425,123 @@ await scenario('risposte rapide ed emoji da tastiera, senza invio automatico', a
   check(await page.locator('.tools button:has-text("Vocale"), .tools button:has-text("Foto")').count() === 0, 'pulsanti media ancora presenti');
   await press(page, 'Enter');
   check(await page.inputValue('textarea') === 'Ok', 'risposta non inserita');
-  check(await activeText(page) === 'Invia', 'il focus deve andare su Invia');
+  check(await activeName(page) === 'Invia', 'il focus deve andare su Invia');
   check((await calls(page, 'sendMessage')).length === 0, 'inviato senza conferma');
   await press(page, 'Enter');
   await page.waitForSelector('.msg.out:has-text("Ok")');
+});
+
+await scenario('chat privata: nessun nome, bolle e ora al loro posto', async (page, context) => {
+  await openNamedChat(page, context, 'Contatto 5');
+  await screenshot(page, 'chat-privata');
+  await noHorizontalScroll(page);
+  check(await page.locator('.msg-sender:visible').count() === 0, 'nome in una chat privata');
+  const shapes = await page.locator('.msg').evaluateAll((items) => items.map((item) => {
+    const bubble = item.querySelector('.bubble');
+    const box = bubble.getBoundingClientRect();
+    const meta = bubble.querySelector('.msg-meta').getBoundingClientRect();
+    const ghost = bubble.querySelector('.msg-meta-ghost').getBoundingClientRect();
+    return {
+      out: item.classList.contains('out'),
+      width: box.width,
+      left: box.left,
+      right: box.right,
+      border: getComputedStyle(bubble).borderTopWidth,
+      background: getComputedStyle(bubble).backgroundColor,
+      insideBubble: meta.right <= box.right && meta.bottom <= box.bottom,
+      onLastLine: Math.abs(ghost.bottom - meta.bottom) < 6 && ghost.right <= meta.right + 1,
+    };
+  }));
+  for (const shape of shapes) {
+    check(shape.width <= 600 * 0.8, `bolla larga ${shape.width}`);
+    check(shape.border === '0px', 'bolla con bordo');
+    check(shape.insideBubble, 'ora fuori dalla bolla');
+    check(shape.onLastLine, 'ora non allineata alla fine del testo');
+  }
+  const mine = shapes.find((shape) => shape.out);
+  const theirs = shapes.find((shape) => !shape.out);
+  check(mine.background !== theirs.background, 'bolle uguali');
+  check(mine.right > theirs.right && theirs.left < mine.left, 'bolle non ai due lati');
+  const size = await page.locator('.msg-text').first().evaluate((item) => parseFloat(getComputedStyle(item).fontSize));
+  check(size >= 16 && size <= 17, `testo ${size}px`);
+});
+
+await scenario('gruppo: nomi solo altrui, sulla prima bolla, colorati per persona', async (page, context) => {
+  await openNamedChat(page, context, 'Gruppo con un nome');
+  await screenshot(page, 'chat-gruppo');
+  await noHorizontalScroll(page);
+  const rows = await page.locator('.msg').evaluateAll((items) => items.map((item) => {
+    const sender = item.querySelector('.msg-sender');
+    return {
+      out: item.classList.contains('out'),
+      first: item.classList.contains('first'),
+      shown: !sender.hidden,
+      name: sender.textContent,
+      color: getComputedStyle(sender).color,
+    };
+  }));
+  check(rows.some((row) => row.shown), 'nessun nome nel gruppo');
+  check(rows.every((row) => !(row.out && row.shown)), 'nome su un mio messaggio');
+  check(rows.every((row) => !row.shown || row.first), 'nome fuori dalla prima bolla');
+  check(rows.filter((row) => !row.out && row.first).every((row) => row.shown), 'prima bolla senza nome');
+  const colors = new Map(rows.filter((row) => row.shown).map((row) => [row.name, row.color]));
+  check(colors.size >= 2 && new Set(colors.values()).size === colors.size, `colori: ${[...colors]}`);
+  const gaps = await page.locator('.msg').evaluateAll((items) => items.map((item) => ({
+    first: item.classList.contains('first'),
+    gap: parseFloat(getComputedStyle(item).paddingTop),
+  })));
+  check(Math.min(...gaps.filter((item) => item.first).map((item) => item.gap))
+    > Math.max(...gaps.filter((item) => !item.first).map((item) => item.gap)), 'spazio tra gruppi troppo piccolo');
+});
+
+await scenario('canale: nessun nome e nessuna bolla in uscita', async (page, context) => {
+  await openNamedChat(page, context, 'Canale 7');
+  check(await page.locator('.msg-sender:visible').count() === 0, 'nome in un canale');
+  check(await page.locator('.msg.out').count() === 0, 'bolla in uscita in un canale');
+});
+
+await scenario('spunte: ✓ inviato, ✓✓ azzurro con l’evento di lettura', async (page, context) => {
+  await openChat(page, context);
+  check(await page.locator('.msg:not(.out) .msg-ticks').count() === 0, 'spunte su un messaggio altrui');
+  const ticks = (id) => page.locator('.msg.out .msg-meta .msg-ticks').nth(id);
+  const count = await page.locator('.msg.out').count();
+  check(await ticks(count - 1).textContent() === '✓', 'l’ultimo messaggio deve avere una spunta');
+  check(await ticks(0).textContent() === '✓✓', 'i messaggi già letti devono averne due');
+  const before = await ticks(count - 1).evaluate((item) => getComputedStyle(item).color);
+  await page.keyboard.type('Letto?');
+  await press(page, 'ArrowRight', 'Enter');
+  await page.waitForSelector('.msg.out:has-text("Letto?")');
+  const sent = page.locator('.msg.out:has-text("Letto?") .msg-meta .msg-ticks');
+  check(await sent.textContent() === '✓', 'nuovo messaggio non come inviato');
+  const id = await page.evaluate(() => window.fakeTg.calls.length && 10_000 + 1);
+  await page.evaluate((maxId) => window.fakeTg.readOutbox('1000', maxId), id);
+  await page.waitForFunction(() => document.querySelector('.msg.out:last-child .msg-meta .msg-ticks').textContent === '✓✓');
+  const after = await sent.evaluate((item) => getComputedStyle(item).color);
+  check(after !== before, 'le spunte lette devono essere azzurre');
+  check(await sent.getAttribute('aria-label') === 'Letto', 'stato non accessibile');
+  await page.goBack();
+  await page.waitForSelector('.chat-row');
+  check(await page.locator('.chat-row').first().locator('.chat-ticks').textContent() === '✓✓', 'lista non aggiornata');
+});
+
+await scenario('barra: pulsanti nel campo arrotondato, invio tondo, stesso ordine', async (page, context) => {
+  await openChat(page, context);
+  await page.waitForFunction(() => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2);
+  check(await page.locator('.composer-field .more').count() === 2, 'pulsanti fuori dal campo');
+  const send = await page.locator('.send').boundingBox();
+  check(Math.abs(send.width - send.height) < 1, 'pulsante di invio non tondo');
+  check(await page.locator('.composer button, .composer textarea').evaluateAll((items) => items
+    .every((item, index, all) => !index
+      || all[index - 1].getBoundingClientRect().right <= item.getBoundingClientRect().left)), 'ordine visivo alterato');
+  await screenshot(page, 'barra');
+  await press(page, 'ArrowLeft');
+  check(await activeName(page) === 'Tastiera dell’app', 'Sinistra deve arrivare alla tastiera');
+  await press(page, 'ArrowLeft');
+  check(await activeName(page) === 'Altre opzioni', 'Sinistra deve arrivare al +');
+  await press(page, 'ArrowRight', 'ArrowRight');
+  check(await activeTag(page) === 'TEXTAREA', 'Destra deve tornare al campo');
+  await press(page, 'ArrowRight');
+  check(await activeName(page) === 'Invia', 'Destra deve arrivare a Invia');
 });
 
 await scenario('tastiera dell’app: scrive in russo con le frecce e invia', async (page, context) => {
@@ -370,7 +558,7 @@ await scenario('tastiera dell’app: scrive in russo con le frecce e invia', asy
   check(await activeText(page) === 'т', 'il focus deve restare sul tasto');
   await pressKey(page, '⌫');
   check(await page.inputValue('textarea') === 'Привет', 'cancellazione errata');
-  await page.locator('.composer button:text-is("Invia")').focus();
+  await page.locator('.send').focus();
   await press(page, 'Enter');
   await page.waitForSelector('.msg.out:has-text("Привет")');
   check(await page.isVisible('.keyboard'), 'la tastiera deve restare aperta dopo l’invio');
@@ -397,7 +585,7 @@ await scenario('tastiera dell’app: maiuscola una tantum, spazio e cambio di la
   await screenshot(page, 'tastiera-123');
   await pressKey(page, 'Chiudi');
   check(await page.isHidden('.keyboard'), 'tastiera ancora aperta');
-  check(await activeText(page) === 'Invia', 'Chiudi deve portare su Invia');
+  check(await activeName(page) === 'Invia', 'Chiudi deve portare su Invia');
 });
 
 await scenario('tutti i tasti di ogni layout si raggiungono con le frecce', async (page, context) => {
