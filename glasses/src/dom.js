@@ -11,6 +11,19 @@ export function h(tag, props = {}, ...children) {
   return el;
 }
 
+// Icona vettoriale: il colore arriva dal testo del pulsante che la contiene.
+export function icon(path) {
+  const namespace = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(namespace, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  const shape = document.createElementNS(namespace, 'path');
+  shape.setAttribute('d', path);
+  shape.setAttribute('fill-rule', 'evenodd');
+  svg.append(shape);
+  return svg;
+}
+
 // Sostituisce il contenuto del contenitore e riporta la pagina in cima.
 export function mount(root, ...children) {
   root.replaceChildren(...children);

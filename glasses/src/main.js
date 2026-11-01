@@ -79,6 +79,7 @@ function showApp(tg) {
       clearSession();
       restart();
     },
+    onOutboxRead: (chatId, maxId) => view.applyEvent({ type: 'read-outbox', chatId, maxId }),
   });
   const view = createChatView({ tg, onRead: (id) => list.setOpenChat(id) });
 

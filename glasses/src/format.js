@@ -4,6 +4,7 @@ const dayFormat = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: '2-d
 const fullDayFormat = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 
 const DAY_MS = 86_400_000;
+const PEER_COLORS = 7;
 
 function startOfDay(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
@@ -90,10 +91,20 @@ export function mediaLabel(media) {
 }
 
 // Il testo può mancare: l'anteprima mostra allora l'etichetta del media.
-export function messagePreview(message) {
+// Nei gruppi dice chi ha scritto, tranne per i propri messaggi.
+export function messagePreview(message, chatType = 'private') {
   if (!message) return '';
-  if (message.media && message.text) return `${message.media} ${message.text}`;
-  return message.media || message.text || '';
+  const body = message.media && message.text
+    ? `${message.media} ${message.text}`
+    : message.media || message.text || '';
+  return chatType === 'group' && !message.out ? `${message.senderShort}: ${body}` : body;
+}
+
+// Tinta fissa per persona o chat: lo stesso id ha sempre lo stesso colore.
+export function colorIndex(id) {
+  let hash = 0;
+  for (const char of String(id)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return hash % PEER_COLORS;
 }
 
 export function initials(title) {

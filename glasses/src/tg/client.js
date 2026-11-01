@@ -46,6 +46,17 @@ function senderLabel(entity) {
   return entity?.className === 'User' && entity.self ? 'Tu' : displayName(entity);
 }
 
+function shortName(entity) {
+  if (entity?.className === 'User' && !entity.self && entity.firstName) return entity.firstName;
+  return senderLabel(entity);
+}
+
+// I supergruppi sono canali per Telegram: `broadcast` distingue i canali veri.
+function chatType(entity) {
+  if (entity?.className === 'User') return 'private';
+  return entity?.className === 'Channel' && entity.broadcast ? 'channel' : 'group';
+}
+
 function translateError(error) {
   const code = error?.errorMessage;
   if (AUTH_LOST.has(code)) {
@@ -74,6 +85,7 @@ function toChatSummary(id, entity) {
   return {
     id,
     title: displayName(entity),
+    type: chatType(entity),
     photoId: photo?.photoId?.toString() ?? null,
     thumb: stripped ? new Uint8Array(utils.strippedPhotoToJpg(stripped)) : null,
   };
@@ -89,6 +101,7 @@ function toMessage(raw, chatId) {
     out: Boolean(raw.out),
     senderId,
     senderName: raw.out ? 'Tu' : senderLabel(entities.get(senderId)),
+    senderShort: raw.out ? 'Tu' : shortName(entities.get(senderId)),
     date: raw.date,
     edited: Boolean(raw.editDate && !raw.editHide),
     text: service ? 'ℹ️ Evento della chat' : raw.message || '',
@@ -103,6 +116,7 @@ function toDialog(dialog, topMessages) {
     ...toChatSummary(id, entities.get(id)),
     pinned: Boolean(dialog.pinned),
     unread: dialog.unreadCount || (dialog.unreadMark ? 1 : 0),
+    readOutboxMaxId: dialog.readOutboxMaxId ?? 0,
     last: raw ? toMessage(raw, id) : null,
   };
 }
@@ -132,13 +146,11 @@ function wireEvents() {
   }, new DeletedMessage({}));
 
   client.addEventHandler((event) => {
-    if (event.outbox || event.contents) return;
+    if (event.contents) return;
     const update = event.originalUpdate;
-    emit({
-      type: 'read',
-      chatId: utils.getPeerId(event.chatPeer ?? update.peer),
-      unread: update.stillUnreadCount ?? 0,
-    });
+    const chatId = utils.getPeerId(event.chatPeer ?? update.peer);
+    if (event.outbox) emit({ type: 'read-outbox', chatId, maxId: event.maxId });
+    else emit({ type: 'read', chatId, unread: update.stillUnreadCount ?? 0 });
   }, new MessageRead({}));
 
   client.onReconnecting(() => emit({ type: 'state', online: false }));

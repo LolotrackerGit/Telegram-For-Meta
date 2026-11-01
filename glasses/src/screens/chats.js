@@ -1,20 +1,21 @@
 import { h } from '../dom.js';
-import { formatListDate, messagePreview } from '../format.js';
+import { colorIndex, formatListDate, messagePreview } from '../format.js';
 
 const REFRESH_DELAY_MS = 1500;
 
 function createRow(onOpen, id) {
-  const avatar = h('span', { class: 'avatar' });
+  const avatar = h('span', { class: `avatar peer-${colorIndex(id)}` });
   const name = h('span', { class: 'chat-name' });
   const time = h('span', { class: 'chat-time' });
+  const ticks = h('span', { class: 'chat-ticks', hidden: true });
   const preview = h('span', { class: 'chat-preview' });
   const badge = h('span', { class: 'chat-badge', hidden: true });
   const button = h('button', { type: 'button', class: 'chat-row', onclick: () => onOpen(id) },
     avatar,
     h('span', { class: 'chat-main' },
       h('span', { class: 'chat-line' }, name, time),
-      h('span', { class: 'chat-line' }, preview, badge)));
-  return { item: h('li', {}, button), button, avatar, name, time, preview, badge };
+      h('span', { class: 'chat-line' }, ticks, preview, badge)));
+  return { item: h('li', {}, button), button, avatar, name, time, ticks, preview, badge };
 }
 
 function setText(element, text) {
@@ -25,7 +26,7 @@ function chatDate(chat) {
   return chat.last?.date ?? 0;
 }
 
-export function createChatList({ tg, avatars, onOpen, onLogout }) {
+export function createChatList({ tg, avatars, onOpen, onLogout, onOutboxRead }) {
   const chats = new Map();
   const rows = new Map();
   let cursor = null;
@@ -61,7 +62,12 @@ export function createChatList({ tg, avatars, onOpen, onLogout }) {
     }
     setText(row.name, chat.title);
     setText(row.time, formatListDate(chatDate(chat)));
-    setText(row.preview, messagePreview(chat.last));
+    setText(row.preview, messagePreview(chat.last, chat.type));
+    const read = chat.last?.id <= chat.readOutboxMaxId;
+    row.ticks.hidden = !chat.last?.out;
+    setText(row.ticks, read ? '✓✓' : '✓');
+    row.ticks.classList.toggle('read', read);
+    row.button.classList.toggle('has-unread', chat.unread > 0);
     setText(row.badge, chat.unread > 99 ? '99+' : String(chat.unread));
     row.badge.hidden = chat.unread === 0;
     row.button.setAttribute('aria-label', `${chat.title}${chat.unread ? `, ${chat.unread} non letti` : ''}`);
@@ -97,7 +103,10 @@ export function createChatList({ tg, avatars, onOpen, onLogout }) {
 
   function merge(dialogs, startIndex = 0) {
     dialogs.forEach((dialog, index) => {
-      const chat = { ...chats.get(dialog.id), ...dialog, pinOrder: startIndex + index };
+      const before = chats.get(dialog.id);
+      const chat = { ...before, ...dialog, pinOrder: startIndex + index };
+      chat.readOutboxMaxId = Math.max(before?.readOutboxMaxId ?? 0, dialog.readOutboxMaxId);
+      if (before && chat.readOutboxMaxId > before.readOutboxMaxId) onOutboxRead(chat.id, chat.readOutboxMaxId);
       if (chat.id === openChatId) chat.unread = 0;
       chats.set(chat.id, chat);
       renderRow(chat);
@@ -167,6 +176,13 @@ export function createChatList({ tg, avatars, onOpen, onLogout }) {
         const known = chats.get(event.chatId);
         if (!known) return;
         known.unread = event.chatId === openChatId ? 0 : event.unread;
+        renderRow(known);
+        break;
+      }
+      case 'read-outbox': {
+        const known = chats.get(event.chatId);
+        if (!known) return;
+        known.readOutboxMaxId = Math.max(known.readOutboxMaxId, event.maxId);
         renderRow(known);
         break;
       }

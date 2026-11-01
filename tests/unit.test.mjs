@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  colorIndex,
   formatListDate,
   initials,
   mediaLabel,
@@ -36,6 +37,21 @@ test('anteprima con testo, solo media e messaggio assente', () => {
   assert.equal(messagePreview({ text: 'ciao', media: null }), 'ciao');
   assert.equal(messagePreview({ text: '', media: '📷 Foto' }), '📷 Foto');
   assert.equal(messagePreview({ text: 'guarda', media: '📷 Foto' }), '📷 Foto guarda');
+});
+
+test('anteprima nei gruppi con il nome, mai sui propri messaggi', () => {
+  const message = { text: 'ciao', media: null, senderShort: 'Giulia', out: false };
+  assert.equal(messagePreview(message, 'group'), 'Giulia: ciao');
+  assert.equal(messagePreview({ ...message, out: true }, 'group'), 'ciao');
+  assert.equal(messagePreview(message, 'channel'), 'ciao');
+  assert.equal(messagePreview(message, 'private'), 'ciao');
+});
+
+test('il colore dipende solo dall’id', () => {
+  assert.equal(colorIndex('1234'), colorIndex('1234'));
+  const indexes = ['1', '-100200', '777000', '42', '9', '31337'].map(colorIndex);
+  assert.ok(indexes.every((index) => index >= 0 && index < 7));
+  assert.ok(new Set(indexes).size > 1);
 });
 
 test('date della lista', () => {

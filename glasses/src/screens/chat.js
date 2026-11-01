@@ -1,5 +1,5 @@
-import { h } from '../dom.js';
-import { formatDay, formatTime, isSameDay } from '../format.js';
+import { h, icon } from '../dom.js';
+import { colorIndex, formatDay, formatTime, isSameDay } from '../format.js';
 import { createKeyboard } from '../keyboard.js';
 import { loadChatLayout, saveChatLayout } from '../storage.js';
 
@@ -10,6 +10,9 @@ const NEAR_BOTTOM_PX = 80;
 const QUICK_REPLIES = ['Ok', 'Sì', 'No', 'Arrivo', 'Ti chiamo dopo', 'Grazie'];
 const QUICK_REPLIES_RU = ['Ок', 'Да', 'Нет', 'Еду', 'Перезвоню', 'Спасибо'];
 const QUICK_EMOJI = ['👍', '❤️', '😂', '😮', '😢', '🙏', '👋', '🔥'];
+
+const ICON_SEND = 'M3 20.5 22 12 3 3.5v6.6L15 12 3 13.9z';
+const ICON_KEYBOARD = 'M3 6h18a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zm2 3v2h2V9H5zm4 0v2h2V9H9zm4 0v2h2V9h-2zm4 0v2h2V9h-2zM5 13v2h2v-2H5zm3.5 0v2h7v-2h-7zM17 13v2h2v-2h-2z';
 
 const root = document.documentElement;
 
@@ -29,28 +32,43 @@ function dropLastCharacter(text) {
   return parts.slice(0, -1).join('');
 }
 
-function fillBody(body, message) {
+function metaParts(message, read) {
+  const time = h('span', { class: message.edited ? 'msg-time msg-edited' : 'msg-time' }, formatTime(message.date));
+  if (!message.out) return [time];
+  const ticks = h('span', { class: read ? 'msg-ticks read' : 'msg-ticks' }, read ? '✓✓' : '✓');
+  ticks.setAttribute('aria-label', read ? 'Letto' : 'Inviato');
+  return [time, ticks];
+}
+
+// L'ora vera sta nell'angolo della bolla. La copia invisibile a fine testo le
+// riserva lo spazio, e lo spazio unificatore la tiene legata all'ultima parola.
+function fillBody(entry, readUpTo) {
+  const { message, body, meta } = entry;
+  const read = message.out && message.id <= readUpTo;
   const parts = [];
   if (message.media) parts.push(h('span', { class: 'msg-media' }, message.media));
   if (message.media && message.text) parts.push(' ');
   if (message.text) parts.push(message.text);
-  const time = h('span', { class: 'msg-time' }, formatTime(message.date));
-  if (message.edited) time.classList.add('msg-edited');
-  body.replaceChildren(...parts, time);
+  const ghost = h('span', { class: 'msg-meta-ghost', 'aria-hidden': 'true' }, ...metaParts(message, read));
+  body.replaceChildren(...parts, '\u00a0', ghost);
+  meta.replaceChildren(...metaParts(message, read));
+  entry.read = read;
 }
 
-function createMessage(message) {
+function createMessage(message, readUpTo) {
   const day = h('p', { class: 'day', hidden: true });
-  const sender = h('span', { class: 'msg-sender', hidden: true });
+  const sender = h('span', { class: `msg-sender peer-${colorIndex(message.senderId)}`, hidden: true });
   const body = h('span', { class: 'msg-text' });
-  const bubble = h('div', { class: 'bubble' }, sender, body);
+  const meta = h('span', { class: 'msg-meta' });
+  const bubble = h('div', { class: 'bubble' }, sender, body, meta);
   const element = h('div', { class: message.out ? 'msg out' : 'msg' }, day, bubble);
-  fillBody(body, message);
-  return { message, element, day, sender, body };
+  const entry = { message, element, day, sender, body, meta, read: false };
+  fillBody(entry, readUpTo);
+  return entry;
 }
 
-// Mostra mittente e giorno solo dove cambiano rispetto al messaggio precedente.
-function decorate(entry, previous) {
+// Il mittente compare solo nei gruppi, sulla prima bolla di ogni serie.
+function decorate(entry, previous, showNames) {
   const { message } = entry;
   const newDay = !previous || !isSameDay(previous.message.date, message.date);
   const newGroup = newDay
@@ -58,7 +76,7 @@ function decorate(entry, previous) {
     || message.date - previous.message.date > GROUP_GAP_SECONDS;
   entry.day.hidden = !newDay;
   if (newDay) entry.day.textContent = formatDay(message.date);
-  entry.sender.hidden = !newGroup;
+  entry.sender.hidden = !(newGroup && showNames && !message.out);
   entry.sender.textContent = message.senderName;
   entry.element.classList.toggle('first', newGroup);
 }
@@ -68,6 +86,8 @@ export function createChatView({ tg, onRead }) {
   const byId = new Map();
   const drafts = new Map();
   let chatId = null;
+  let showNames = false;
+  let readUpTo = 0;
   let session = 0;
   let hasMore = false;
   let loadingOlder = false;
@@ -90,7 +110,7 @@ export function createChatView({ tg, onRead }) {
     oninput: onDraft,
     onchange: onDraft,
   });
-  const sendButton = h('button', { type: 'button', onclick: send }, 'Invia');
+  const sendButton = h('button', { type: 'button', class: 'send', 'aria-label': 'Invia', onclick: send }, icon(ICON_SEND));
   const moreButton = h('button', {
     type: 'button',
     class: 'more',
@@ -104,7 +124,7 @@ export function createChatView({ tg, onRead }) {
     'aria-label': 'Tastiera dell’app',
     'aria-expanded': 'false',
     onclick: toggleKeyboard,
-  }, '⌨');
+  }, icon(ICON_KEYBOARD));
   const chip = (text) => h('button', { type: 'button', onclick: () => insertText(text) }, text);
   const quickReplies = h('div', { class: 'chips' });
   const tools = h('div', { class: 'tools', hidden: true },
@@ -117,7 +137,9 @@ export function createChatView({ tg, onRead }) {
     onLayout: (layout) => saveChatLayout(chatId, layout),
     onClose: closeKeyboard,
   });
-  const composer = h('div', { class: 'composer' }, moreButton, keyboardButton, field, sendButton);
+  const composer = h('div', { class: 'composer' },
+    h('div', { class: 'composer-field' }, moreButton, keyboardButton, field),
+    sendButton);
   const element = h('section', { class: 'chat', hidden: true },
     h('header', { class: 'topbar' }, title),
     h('div', { class: 'messages' }, older, list),
@@ -227,8 +249,8 @@ export function createChatView({ tg, onRead }) {
 
   function append(message) {
     if (byId.has(message.id)) return false;
-    const entry = createMessage(message);
-    decorate(entry, entries.at(-1));
+    const entry = createMessage(message, readUpTo);
+    decorate(entry, entries.at(-1), showNames);
     entries.push(entry);
     byId.set(message.id, entry);
     list.append(entry.element);
@@ -236,12 +258,14 @@ export function createChatView({ tg, onRead }) {
   }
 
   function prepend(messages) {
-    const fresh = messages.filter((message) => !byId.has(message.id)).map(createMessage);
+    const fresh = messages
+      .filter((message) => !byId.has(message.id))
+      .map((message) => createMessage(message, readUpTo));
     fresh.forEach((entry, index) => {
-      decorate(entry, fresh[index - 1]);
+      decorate(entry, fresh[index - 1], showNames);
       byId.set(entry.message.id, entry);
     });
-    if (entries[0]) decorate(entries[0], fresh.at(-1));
+    if (entries[0]) decorate(entries[0], fresh.at(-1), showNames);
     list.prepend(...fresh.map((entry) => entry.element));
     entries.unshift(...fresh);
   }
@@ -276,7 +300,7 @@ export function createChatView({ tg, onRead }) {
     const text = draft.trim();
     if (!text || sending) return;
     sending = true;
-    sendButton.textContent = 'Invio…';
+    sendButton.classList.add('sending');
     error.hidden = true;
     const target = chatId;
     try {
@@ -294,7 +318,7 @@ export function createChatView({ tg, onRead }) {
       error.hidden = false;
     } finally {
       sending = false;
-      sendButton.textContent = 'Invia';
+      sendButton.classList.remove('sending');
     }
   }
 
@@ -302,6 +326,8 @@ export function createChatView({ tg, onRead }) {
     session += 1;
     const current = session;
     chatId = chat.id;
+    showNames = chat.type === 'group';
+    readUpTo = chat.readOutboxMaxId;
     reset();
     title.textContent = chat.title;
     draft = drafts.get(chat.id) ?? '';
@@ -378,7 +404,12 @@ export function createChatView({ tg, onRead }) {
       const entry = byId.get(event.message.id);
       if (!entry) return;
       entry.message = event.message;
-      fillBody(entry.body, event.message);
+      fillBody(entry, readUpTo);
+    } else if (event.type === 'read-outbox' && event.chatId === chatId) {
+      readUpTo = Math.max(readUpTo, event.maxId);
+      for (const entry of entries) {
+        if (entry.message.out && !entry.read && entry.message.id <= readUpTo) fillBody(entry, readUpTo);
+      }
     } else if (event.type === 'delete' && (event.chatId === null || event.chatId === chatId)) {
       for (const id of event.ids) {
         const entry = byId.get(id);
@@ -387,7 +418,7 @@ export function createChatView({ tg, onRead }) {
         entries.splice(index, 1);
         byId.delete(id);
         entry.element.remove();
-        if (entries[index]) decorate(entries[index], entries[index - 1]);
+        if (entries[index]) decorate(entries[index], entries[index - 1], showNames);
       }
     }
   }
